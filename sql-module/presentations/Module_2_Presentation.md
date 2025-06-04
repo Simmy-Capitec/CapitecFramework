@@ -38,9 +38,16 @@ graph TD
         C1[User] --> C2[Profile]
     end
     
-    style A1 fill:#e1f5fe
-    style B3 fill:#fff3e0
-    style C1 fill:#f3e5f5
+    style A1 fill:#2196F3,stroke:#1976D2,stroke-width:2px,color:#fff
+    style A2 fill:#4CAF50,stroke:#388E3C,stroke-width:2px,color:#fff
+    style A3 fill:#4CAF50,stroke:#388E3C,stroke-width:2px,color:#fff
+    style A4 fill:#4CAF50,stroke:#388E3C,stroke-width:2px,color:#fff
+    style B1 fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
+    style B2 fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
+    style B3 fill:#9C27B0,stroke:#7B1FA2,stroke-width:2px,color:#fff
+    style B4 fill:#4CAF50,stroke:#388E3C,stroke-width:2px,color:#fff
+    style C1 fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
+    style C2 fill:#4CAF50,stroke:#388E3C,stroke-width:2px,color:#fff
 ```
 
 ---

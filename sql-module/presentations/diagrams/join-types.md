@@ -34,10 +34,18 @@ graph TD
         D2 --> D3
     end
     
-    style A3 fill:#c8e6c9
-    style B3 fill:#fff3c4
-    style C3 fill:#fff3c4
-    style D3 fill:#ffccbc
+    style A1 fill:#2196F3,stroke:#1976D2,stroke-width:2px,color:#fff
+    style A2 fill:#2196F3,stroke:#1976D2,stroke-width:2px,color:#fff
+    style A3 fill:#4CAF50,stroke:#388E3C,stroke-width:2px,color:#fff
+    style B1 fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
+    style B2 fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
+    style B3 fill:#9C27B0,stroke:#7B1FA2,stroke-width:2px,color:#fff
+    style C1 fill:#FF5722,stroke:#D84315,stroke-width:2px,color:#fff
+    style C2 fill:#FF5722,stroke:#D84315,stroke-width:2px,color:#fff
+    style C3 fill:#9C27B0,stroke:#7B1FA2,stroke-width:2px,color:#fff
+    style D1 fill:#607D8B,stroke:#455A64,stroke-width:2px,color:#fff
+    style D2 fill:#607D8B,stroke:#455A64,stroke-width:2px,color:#fff
+    style D3 fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
 ```
 
 ## JOIN Usage in Testing
@@ -56,10 +64,16 @@ flowchart LR
     E --> I[All orders, with/without users]
     F --> J[Complete data audit]
     
-    style C fill:#c8e6c9
-    style D fill:#fff3c4
-    style E fill:#fff3c4
-    style F fill:#ffccbc
+    style A fill:#2196F3,stroke:#1976D2,stroke-width:2px,color:#fff
+    style B fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
+    style C fill:#4CAF50,stroke:#388E3C,stroke-width:2px,color:#fff
+    style D fill:#9C27B0,stroke:#7B1FA2,stroke-width:2px,color:#fff
+    style E fill:#FF5722,stroke:#D84315,stroke-width:2px,color:#fff
+    style F fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
+    style G fill:#4CAF50,stroke:#388E3C,stroke-width:2px,color:#fff
+    style H fill:#9C27B0,stroke:#7B1FA2,stroke-width:2px,color:#fff
+    style I fill:#FF5722,stroke:#D84315,stroke-width:2px,color:#fff
+    style J fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
 ```
 
 ## Common Testing Scenarios
