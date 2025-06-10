@@ -4,6 +4,59 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Project: SQL Zero-to-Hero Module Development
 
+### 🚀 INITIALIZATION PROCESS FOR PRESENTATION
+
+#### Step 1: Install Dependencies
+```bash
+# Install npm dependencies for the Playwright framework
+npm install
+```
+
+#### Step 2: Setup Database
+```bash
+# Option A: Using the remote training database (Already configured)
+# Database: 34.10.193.47
+# User: root
+# Password: 2mD%nP9;rKH=;;Nj
+# Database: sql_training
+
+# Option B: Local database setup (if needed)
+./setup-database.sh
+# Then manually run:
+sudo mysql < sql-module/setup/clean-setup.sql
+```
+
+#### Step 3: Verify MCP Servers (Optional - for advanced features)
+```bash
+# Check MCP server setup
+./setup-mcp.sh
+
+# List configured MCP servers
+claude mcp list
+```
+
+#### Step 4: Test Database Connection
+```bash
+# Test the database connection
+node -e "import('./sql-module/setup/database-connection.js').then(db => db.initializeDatabase())"
+```
+
+#### Step 5: Run Sample Tests
+```bash
+# Run a simple test to verify everything works
+npm run test:headed tests/login.spec.js
+
+# Or run all tests
+npm test
+```
+
+#### Quick Presentation Start
+For the presentation, you mainly need:
+1. **Course materials**: `/sql-module/` directory
+2. **Presentations**: `/sql-module/presentations/`
+3. **Sample code**: Working Playwright tests in `/tests/`
+4. **Database**: Already configured remote MySQL instance
+
 ### Progress Tracking
 - ✅ MCP Server Recommendations completed
 - ✅ Module Structure and outline completed  

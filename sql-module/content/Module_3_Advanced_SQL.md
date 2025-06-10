@@ -487,8 +487,10 @@ CREATE INDEX idx_active_products ON products(category_id) WHERE is_active = TRUE
 #### Index Usage Analysis
 
 ```sql
--- Check index usage
+-- Check index usage on main tables
 SHOW INDEX FROM orders;
+SHOW INDEX FROM order_items;
+SHOW INDEX FROM products;
 
 -- Analyze query with index
 EXPLAIN SELECT * FROM orders WHERE status = 'pending';
@@ -505,19 +507,24 @@ SELECT
     CARDINALITY
 FROM information_schema.STATISTICS
 WHERE TABLE_SCHEMA = 'sql_training'
-AND TABLE_NAME = 'orders';
+AND TABLE_NAME IN ('orders', 'order_items', 'products', 'users')
+ORDER BY TABLE_NAME, INDEX_NAME;
 ```
 
 #### Index Best Practices
 
 ```sql
 -- Good: Selective columns first in composite index
-CREATE INDEX idx_orders_date_status ON orders(created_at, status);
+CREATE INDEX idx_orders_status_date ON orders(status, created_at);
 
--- Better for range queries on created_at
+-- Better for this common query pattern
 SELECT * FROM orders 
-WHERE created_at >= '2024-01-01' 
-AND status = 'delivered';
+WHERE status = 'delivered'
+AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY);
+
+-- For product searches
+CREATE INDEX idx_products_name ON products(name);
+CREATE INDEX idx_products_sku ON products(sku);
 
 -- Index for ORDER BY
 CREATE INDEX idx_products_category_price_desc ON products(category_id, price DESC);
@@ -535,12 +542,16 @@ LIMIT 10;
 
 ```sql
 -- Bad: Function on column prevents index usage
-SELECT * FROM orders WHERE YEAR(created_at) = 2024;
+SELECT * FROM orders WHERE YEAR(created_at) = 2025;
+SELECT * FROM users WHERE LOWER(email) = 'john.doe@email.com';
 
 -- Good: Range condition allows index usage
 SELECT * FROM orders 
-WHERE created_at >= '2024-01-01' 
-AND created_at < '2025-01-01';
+WHERE created_at >= '2025-01-01' 
+AND created_at < '2026-01-01';
+
+-- Good: Store lowercase email if case-insensitive search needed
+SELECT * FROM users WHERE email = 'john.doe@email.com';
 
 -- Bad: OR conditions often prevent index usage
 SELECT * FROM products WHERE category_id = 1 OR category_id = 2;
@@ -583,11 +594,12 @@ ORDER BY id
 LIMIT 20 OFFSET 40;  -- Page 3, 20 items per page
 
 -- Use WHERE to filter early
-SELECT u.username, COUNT(o.id) as order_count
+SELECT u.username, u.email, COUNT(o.id) as order_count
 FROM users u
-LEFT JOIN orders o ON u.id = o.user_id
-WHERE u.is_active = TRUE  -- Filter before JOIN
-GROUP BY u.id, u.username;
+LEFT JOIN orders o ON u.id = o.user_id AND o.status IN ('delivered', 'shipped')
+WHERE u.is_active = 1  -- Filter before aggregation
+  AND u.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+GROUP BY u.id, u.username, u.email;
 ```
 
 #### 4. Optimize Subqueries
@@ -732,22 +744,26 @@ CALL test_query_performance(
 
 ```sql
 -- Generate test data for performance testing
-INSERT INTO test_orders (user_id, total_amount, status, created_at)
+-- First, create a numbers table for generating rows
+CREATE TEMPORARY TABLE IF NOT EXISTS numbers (n INT);
+INSERT INTO numbers VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
+
+-- Generate test orders (1000 rows)
+INSERT INTO orders (order_number, user_id, status, total_amount, shipping_address, billing_address, created_at)
 SELECT 
-    FLOOR(RAND() * 100) + 1,
-    RAND() * 1000,
-    CASE FLOOR(RAND() * 4)
-        WHEN 0 THEN 'pending'
-        WHEN 1 THEN 'processing'
-        WHEN 2 THEN 'delivered'
-        ELSE 'cancelled'
-    END,
+    CONCAT('TEST-', LPAD((@row_num:=@row_num+1), 6, '0')),
+    FLOOR(RAND() * 8) + 1,  -- Random user from 1-8
+    ELT(FLOOR(RAND() * 5) + 1, 'pending', 'processing', 'shipped', 'delivered', 'cancelled'),
+    ROUND(RAND() * 1000 + 10, 2),
+    CONCAT(FLOOR(RAND() * 999) + 1, ' Test St, Test City, TS 12345'),
+    CONCAT(FLOOR(RAND() * 999) + 1, ' Test St, Test City, TS 12345'),
     DATE_SUB(NOW(), INTERVAL FLOOR(RAND() * 365) DAY)
 FROM 
-    (SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) t1,
-    (SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) t2,
-    (SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) t3,
-    (SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) t4;  -- 256 rows
+    numbers n1,
+    numbers n2,
+    numbers n3,
+    (SELECT @row_num:=1000) r
+LIMIT 1000;
 ```
 
 #### 2. Test Before and After Index Changes
@@ -817,37 +833,48 @@ INNER JOIN categories ON products.category_id = categories.id;
 #### 3. Inefficient WHERE Clauses
 
 ```sql
--- Bad: Function prevents index usage
-SELECT * FROM orders WHERE DATE(created_at) = '2024-01-15';
+-- Bad: Multiple inefficiencies
+SELECT * FROM products p, categories c 
+WHERE p.category_id = c.id 
+AND DATE(p.created_at) = '2025-06-04'
+AND UPPER(p.name) LIKE '%LAPTOP%';
 
--- Good: Range condition
-SELECT * FROM orders 
-WHERE created_at >= '2024-01-15 00:00:00' 
-AND created_at < '2024-01-16 00:00:00';
+-- Good: Optimized version
+SELECT p.id, p.name, p.price, c.name AS category
+FROM products p
+INNER JOIN categories c ON p.category_id = c.id
+WHERE p.created_at >= '2025-06-04 00:00:00' 
+  AND p.created_at < '2025-06-05 00:00:00'
+  AND p.name LIKE '%Laptop%'  -- Assuming consistent casing
 ```
 
 ### Lab Exercises
 
 #### Exercise 1: Aggregate Analysis
 1. Create a sales report showing monthly revenue by category
-2. Find the top 5 customers by lifetime value
-3. Calculate conversion rates (orders/users) by month
+2. Find the top 5 customers by lifetime value with their order patterns
+3. Calculate conversion rates (users with orders / total users) by registration month
+4. Analyze product performance: units sold, revenue, and return rate by category
 
 #### Exercise 2: Window Functions
-1. Rank products by sales within each category
-2. Calculate running totals for daily orders
-3. Find customers with declining order values
+1. Rank products by sales volume and revenue within each category
+2. Calculate 7-day and 30-day moving averages for order values
+3. Identify customers with declining order frequency using LAG/LEAD
+4. Create a cohort analysis showing customer retention by month
 
 #### Exercise 3: Performance Optimization
-1. Identify slow queries using EXPLAIN
-2. Add appropriate indexes
-3. Measure performance improvements
-4. Optimize a complex reporting query
+1. Use EXPLAIN ANALYZE to identify slow queries in the order processing flow
+2. Create covering indexes for the most common query patterns
+3. Measure query performance before and after optimization
+4. Optimize a complex inventory report that joins 5+ tables
+5. Implement query result caching strategies
 
 #### Exercise 4: Advanced CTEs
-1. Build a product recommendation system using CTEs
-2. Create a customer segmentation analysis
-3. Analyze purchase patterns over time
+1. Build a product recommendation system based on purchase patterns
+2. Create RFM (Recency, Frequency, Monetary) customer segmentation
+3. Analyze seasonal purchase patterns and predict inventory needs
+4. Generate a multi-level sales funnel analysis from browsing to purchase
+5. Create a recursive CTE to analyze referral chains (if applicable)
 
 ### Summary
 

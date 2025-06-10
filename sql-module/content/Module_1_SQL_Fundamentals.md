@@ -153,26 +153,32 @@ Common MySQL data types:
 
 ```sql
 -- Create a database
-CREATE DATABASE IF NOT EXISTS testautomation;
+CREATE DATABASE IF NOT EXISTS sql_training;
 
 -- Use the database
-USE testautomation;
+USE sql_training;
 
--- Create a users table
+-- Create a users table (already exists in our training database)
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
+    phone VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_active BOOLEAN DEFAULT TRUE
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    is_active TINYINT(1) DEFAULT 1,
+    last_login DATETIME
 );
 
 -- View table structure
 DESCRIBE users;
 
--- View all tables
+-- View all tables in our training database
 SHOW TABLES;
+-- Returns: cart_items, categories, order_items, orders, products, reviews, users
 ```
 
 ## Module 1.2: Basic SQL Syntax
@@ -204,7 +210,8 @@ SELECT username, email FROM users;
 SELECT 
     username AS 'User Name',
     email AS 'Email Address',
-    created_at AS 'Registration Date'
+    created_at AS 'Registration Date',
+    last_login AS 'Last Active'
 FROM users;
 ```
 
@@ -221,9 +228,12 @@ SELECT * FROM users WHERE username = 'johndoe';
 SELECT * FROM users WHERE is_active != FALSE;
 SELECT * FROM users WHERE is_active <> FALSE;  -- Alternative syntax
 
+-- == what we expect
+-- != what we don't expect
+
 -- Greater than / Less than
 SELECT * FROM products WHERE price > 100;
-SELECT * FROM products WHERE stock_quantity < 10;
+SELECT * FROM products WHERE stock_quantity < reorder_level;
 
 -- Greater than or equal / Less than or equal
 SELECT * FROM orders WHERE total_amount >= 50;
@@ -237,7 +247,7 @@ SELECT * FROM orders WHERE created_at <= '2024-01-01';
 SELECT * FROM products 
 WHERE price > 50 
   AND stock_quantity > 0 
-  AND category = 'Electronics';
+  AND is_active = 1;
 ```
 
 **OR - At least one condition must be true**:
@@ -250,19 +260,30 @@ WHERE email LIKE '%gmail.com'
 **NOT - Negates a condition**:
 ```sql
 SELECT * FROM products 
-WHERE NOT category = 'Discontinued';
+WHERE NOT is_active = 0;
+-- Or simply:
+SELECT * FROM products WHERE is_active = 1;
 ```
 
 #### Pattern Matching with LIKE
 
-```sql
--- % matches any sequence of characters
+-- LIKE is used for pattern matching in strings
+-- It supports two special wildcard characters: % and _
+
+-- % matches any sequence of characters (zero or more)
+-- Examples: 
+--   '%@gmail.com' matches 'john@gmail.com', 'mary.smith@gmail.com'
+--   'iPhone%' matches 'iPhone', 'iPhone 12', 'iPhone Pro Max'
 SELECT * FROM users WHERE email LIKE '%@gmail.com';
 SELECT * FROM products WHERE name LIKE 'iPhone%';
 SELECT * FROM customers WHERE address LIKE '%New York%';
 
 -- _ matches exactly one character
-SELECT * FROM products WHERE sku LIKE 'PRD_____';  -- Matches PRD12345
+-- Examples:
+--   'LAP___' matches exactly 6 characters starting with 'LAP'
+--   'PHN___' matches exactly 6 characters starting with 'PHN'
+SELECT * FROM products WHERE sku LIKE 'LAP___';  -- Matches LAP001, LAP002
+SELECT * FROM products WHERE sku LIKE 'PHN___';  -- Matches PHN001, PHN002, PHN003
 ```
 
 #### The IN Operator
@@ -298,13 +319,14 @@ NULL represents missing or unknown data.
 
 ```sql
 -- Check for NULL
-SELECT * FROM users WHERE phone_number IS NULL;
+SELECT * FROM users WHERE phone IS NULL;
+SELECT * FROM orders WHERE notes IS NULL;
 
 -- Check for NOT NULL
-SELECT * FROM users WHERE phone_number IS NOT NULL;
+SELECT * FROM users WHERE phone IS NOT NULL;
 
 -- WRONG way (won't work)
-SELECT * FROM users WHERE phone_number = NULL;  -- Don't do this!
+SELECT * FROM users WHERE phone = NULL;  -- Don't do this!
 ```
 
 **NULL in Calculations**:
@@ -333,12 +355,12 @@ ORDER BY last_name ASC, first_name ASC;
 
 -- Sort by calculated field
 SELECT 
-    product_name,
+    name AS product_name,
     price,
-    quantity,
-    price * quantity AS total_value
-FROM inventory
-ORDER BY total_value DESC;
+    stock_quantity,
+    price * stock_quantity AS inventory_value
+FROM products
+ORDER BY inventory_value DESC;
 ```
 
 ### LIMIT Clause
@@ -355,10 +377,15 @@ SELECT * FROM users LIMIT 10 OFFSET 10;
 -- Alternative syntax
 SELECT * FROM users LIMIT 10, 10;  -- LIMIT offset, count
 
--- Common use: Get most recent entries
-SELECT * FROM log_entries 
+-- Common use: Get most recent orders
+SELECT * FROM orders 
 ORDER BY created_at DESC 
 LIMIT 5;
+
+-- Get top 10 most expensive products
+SELECT name, price FROM products
+ORDER BY price DESC
+LIMIT 10;
 ```
 
 ### DISTINCT Keyword
@@ -366,18 +393,19 @@ LIMIT 5;
 Remove duplicate rows from results.
 
 ```sql
--- Get unique categories
-SELECT DISTINCT category FROM products;
+-- Get unique statuses
+SELECT DISTINCT status FROM orders;
 
 -- Multiple columns (combination must be unique)
-SELECT DISTINCT category, subcategory FROM products;
+SELECT DISTINCT status, YEAR(created_at) AS order_year 
+FROM orders;
 
 -- Count unique values
-SELECT COUNT(DISTINCT customer_id) AS unique_customers 
+SELECT COUNT(DISTINCT user_id) AS unique_customers 
 FROM orders;
 ```
 
-### Practical Examples for Testing
+<!-- ### Practical Examples for Testing
 
 #### Example 1: Verify User Registration
 ```sql
@@ -385,32 +413,39 @@ FROM orders;
 SELECT * FROM users 
 WHERE email = 'testuser@example.com' 
   AND created_at > NOW() - INTERVAL 1 MINUTE;
+
+-- Verify all user fields were saved correctly
+SELECT id, username, email, first_name, last_name, is_active
+FROM users 
+WHERE username = 'testuser123'; -->
 ```
 
 #### Example 2: Validate Product Inventory
 ```sql
--- Find products that need restocking
+-- Find products with low stock
 SELECT 
-    product_name,
-    stock_quantity,
-    reorder_level
+    name,
+    sku,
+    stock_quantity
 FROM products
-WHERE stock_quantity < reorder_level
+WHERE stock_quantity < 10
+  AND is_active = 1
 ORDER BY stock_quantity ASC;
 ```
 
 #### Example 3: Check Order Status
 ```sql
--- Get recent orders for a customer
+-- Get orders for a specific user
 SELECT 
-    order_id,
-    order_date,
+    id,
+    order_number,
+    created_at,
     total_amount,
     status
 FROM orders
-WHERE customer_email = 'john@example.com'
-  AND order_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-ORDER BY order_date DESC;
+WHERE user_id = 1
+ORDER BY created_at DESC
+LIMIT 10;
 ```
 
 ### Common Pitfalls and Best Practices
@@ -431,7 +466,12 @@ SELECT * FROM orders WHERE order_date = '2024-01-15';
 
 -- For datetime, be careful with time component
 SELECT * FROM orders 
-WHERE DATE(created_at) = '2024-01-15';  -- Ignores time
+WHERE DATE(created_at) = '2025-06-04';  -- Ignores time
+
+-- To include time range:
+SELECT * FROM orders
+WHERE created_at >= '2025-06-04 00:00:00'
+  AND created_at < '2025-06-05 00:00:00';
 ```
 
 #### 3. Avoid SELECT * in Production
@@ -443,20 +483,22 @@ SELECT * FROM large_table;
 SELECT id, name, email FROM large_table;
 ```
 
-#### 4. Use Meaningful Aliases
+<!-- #### 4. Use Meaningful Aliases
 ```sql
 -- Bad: Confusing aliases
-SELECT u.n, o.t 
+SELECT u.u, o.t 
 FROM users u 
-JOIN orders o ON u.id = o.uid;
+JOIN orders o ON u.id = o.user_id;
 
 -- Good: Clear aliases
 SELECT 
-    users.name AS customer_name,
-    orders.total AS order_total
-FROM users
-JOIN orders ON users.id = orders.user_id;
-```
+    u.username AS customer_name,
+    u.email,
+    o.total_amount AS order_total,
+    o.status
+FROM users u
+JOIN orders o ON u.id = o.user_id;
+``` -->
 
 ### Lab Exercises
 
@@ -464,9 +506,9 @@ JOIN orders ON users.id = orders.user_id;
 Create these queries using the sample e-commerce database:
 
 1. Find all active users
-2. List products priced between $10 and $50
-3. Get orders placed in the last 7 days
-4. Find users with Gmail addresses
+2. List products priced between $10 and $50 
+3. Get orders placed in the last 7 days 
+4. Find users with Gmail addresses 
 5. List top 5 most expensive products
 
 #### Exercise 2: Complex Filters

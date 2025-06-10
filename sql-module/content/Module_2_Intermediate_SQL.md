@@ -39,8 +39,27 @@ JOIN table2 ON table1.column = table2.column;
 Returns only rows that have matching values in both tables.
 
 #### Example: Users and Their Orders
+
+Let's start with the basic syntax without aliases:
+
 ```sql
--- Basic INNER JOIN
+-- Basic INNER JOIN - full table names
+SELECT 
+    users.username,
+    users.email,
+    orders.order_number,
+    orders.total_amount,
+    orders.status
+FROM users
+INNER JOIN orders ON users.id = orders.user_id;
+```
+
+**Why do we need table prefixes?** When joining tables, both tables might have columns with the same name (like `id` or `created_at`). We need to specify which table each column comes from to avoid ambiguity.
+
+**Introducing Table Aliases** - As queries get longer, typing full table names becomes tedious. We can use short aliases:
+
+```sql
+-- Using simple table aliases for cleaner code
 SELECT 
     users.username,
     users.email,
@@ -50,7 +69,7 @@ SELECT
 FROM users
 INNER JOIN orders ON users.id = orders.user_id;
 
--- Using table aliases for cleaner code
+-- Same query with aliases (u = users, o = orders)
 SELECT 
     u.username,
     u.email,
@@ -61,44 +80,95 @@ FROM users u
 INNER JOIN orders o ON u.id = o.user_id;
 ```
 
-#### Multiple Table JOINs
+#### When Aliases Become Necessary
+
+As we join more tables, aliases become essential for readability:
+
 ```sql
--- Get order details with user and product information
+-- Multiple table JOINs - here aliases are very helpful
+-- Without aliases, this would be much harder to read!
+SELECT 
+    users.username,
+    users.email,
+    orders.order_number,
+    products.name AS product_name,
+    order_items.quantity
+FROM users
+INNER JOIN orders ON users.id = orders.user_id
+INNER JOIN order_items ON orders.id = order_items.order_id
+INNER JOIN products ON order_items.product_id = products.id;
+
+-- Much cleaner with meaningful aliases:
 SELECT 
     u.username,
+    u.email,
     o.order_number,
     p.name AS product_name,
-    oi.quantity,
-    oi.unit_price,
-    oi.total_price
+    oi.quantity
 FROM users u
 INNER JOIN orders o ON u.id = o.user_id
 INNER JOIN order_items oi ON o.id = oi.order_id
-INNER JOIN products p ON oi.product_id = p.id
-WHERE o.status = 'delivered';
+INNER JOIN products p ON oi.product_id = p.id;
 ```
+
+**Tip:** Use meaningful aliases like `u` for users, `o` for orders, `p` for products. Avoid confusing single letters like `a`, `b`, `c`.
 
 ### LEFT JOIN (LEFT OUTER JOIN)
 
 Returns all rows from the left table and matched rows from the right table. NULL for non-matching right side.
 
 #### Example: All Users, With or Without Orders
+
+Let's build this up step by step:
+
 ```sql
--- Find all users and their order counts (including users with no orders)
+-- First, a simple LEFT JOIN to see all users and their orders
+SELECT 
+    users.username,
+    users.email,
+    orders.order_number,
+    orders.total_amount
+FROM users
+LEFT JOIN orders ON users.id = orders.user_id
+ORDER BY users.username;
+
+-- Now with aliases for cleaner code
 SELECT 
     u.username,
     u.email,
-    COUNT(o.id) AS order_count,
-    COALESCE(SUM(o.total_amount), 0) AS total_spent
+    o.order_number,
+    o.total_amount
+FROM users u
+LEFT JOIN orders o ON u.id = o.user_id
+ORDER BY u.username;
+
+-- Advanced: Count orders per user (including users with no orders)
+-- Note: This uses GROUP BY which we'll cover in Module 3
+SELECT 
+    u.username,
+    u.email,
+    COUNT(o.id) AS order_count
 FROM users u
 LEFT JOIN orders o ON u.id = o.user_id
 GROUP BY u.id, u.username, u.email
-ORDER BY total_spent DESC;
+ORDER BY order_count DESC;
 ```
 
 #### Finding Records Without Matches
+
+This is a common and very useful pattern:
+
 ```sql
 -- Find users who have never placed an order
+SELECT 
+    users.username,
+    users.email,
+    users.created_at
+FROM users
+LEFT JOIN orders ON users.id = orders.user_id
+WHERE orders.id IS NULL;
+
+-- Same query with aliases
 SELECT 
     u.username,
     u.email,
@@ -109,10 +179,9 @@ WHERE o.id IS NULL;
 
 -- Find products that have never been ordered
 SELECT 
-    p.sku,
     p.name,
-    p.price,
-    p.stock_quantity
+    p.sku,
+    p.price
 FROM products p
 LEFT JOIN order_items oi ON p.id = oi.product_id
 WHERE oi.id IS NULL;
@@ -184,12 +253,12 @@ LIMIT 10;
 Joining a table to itself, useful for hierarchical data.
 
 ```sql
--- Find employees and their managers
+-- Find categories and their parent categories
 SELECT 
-    e1.name AS employee,
-    e2.name AS manager
-FROM employees e1
-LEFT JOIN employees e2 ON e1.manager_id = e2.id;
+    c1.name AS category,
+    c2.name AS parent_category
+FROM categories c1
+LEFT JOIN categories c2 ON c1.parent_id = c2.id;
 
 -- Find products in the same category
 SELECT 
@@ -235,18 +304,18 @@ HAVING difference != 0;
 
 #### Pattern 3: Test Data Generation
 ```sql
--- Get test users with specific characteristics
-SELECT DISTINCT
-    u.id,
+-- Get test users who have placed recent orders
+SELECT 
     u.username,
-    u.email
+    u.email,
+    o.order_number,
+    o.total_amount,
+    o.created_at
 FROM users u
 INNER JOIN orders o ON u.id = o.user_id
-INNER JOIN order_items oi ON o.id = oi.order_id
-INNER JOIN products p ON oi.product_id = p.id
-WHERE p.category_id = 1  -- Electronics
-  AND o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+WHERE o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
   AND o.status = 'delivered'
+ORDER BY o.created_at DESC
 LIMIT 5;
 ```
 
@@ -354,13 +423,13 @@ Add new records to a table.
 
 #### Basic INSERT Syntax
 ```sql
--- Insert single row with all columns
-INSERT INTO users (username, email, password_hash, first_name, last_name)
-VALUES ('newuser', 'new@example.com', 'hash123', 'New', 'User');
+-- Insert single row with all required columns
+INSERT INTO users (username, email, password_hash, first_name, last_name, phone)
+VALUES ('newuser', 'new@example.com', 'hash123', 'New', 'User', '555-0199');
 
--- Insert with default values
-INSERT INTO products (sku, name, price)
-VALUES ('TEST001', 'Test Product', 29.99);
+-- Insert product with category reference
+INSERT INTO products (sku, name, description, price, category_id, stock_quantity)
+VALUES ('TEST001', 'Test Product', 'A test product description', 29.99, 1, 100);
 -- Other columns get default values or NULL
 ```
 
@@ -431,23 +500,30 @@ WHERE category_id = 1;
 ```sql
 -- Update based on data from another table
 UPDATE orders o
-INNER JOIN users u ON o.user_id = u.id
-SET o.status = 'vip_processing'
-WHERE u.total_spent > 10000
+INNER JOIN (
+    SELECT user_id, SUM(total_amount) as total_spent
+    FROM orders
+    WHERE status = 'delivered'
+    GROUP BY user_id
+) user_totals ON o.user_id = user_totals.user_id
+SET o.status = 'processing'
+WHERE user_totals.total_spent > 1000
   AND o.status = 'pending';
 
--- Update products based on order history
+-- Update product stock based on recent sales
 UPDATE products p
-LEFT JOIN (
-    SELECT product_id, SUM(quantity) as total_sold
+INNER JOIN (
+    SELECT oi.product_id, SUM(oi.quantity) as total_sold
     FROM order_items oi
     INNER JOIN orders o ON oi.order_id = o.id
     WHERE o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-    GROUP BY product_id
+      AND o.status IN ('delivered', 'shipped')
+    GROUP BY oi.product_id
 ) sales ON p.id = sales.product_id
-SET p.is_bestseller = CASE 
-    WHEN sales.total_sold >= 100 THEN TRUE 
-    ELSE FALSE 
+SET p.reorder_level = CASE 
+    WHEN sales.total_sold >= 50 THEN p.reorder_level * 2
+    WHEN sales.total_sold >= 20 THEN CEILING(p.reorder_level * 1.5)
+    ELSE p.reorder_level
 END;
 ```
 
@@ -647,23 +723,26 @@ UPDATE users SET is_active = FALSE WHERE last_login < '2023-01-01';
 
 #### 2. Test in Development First
 ```sql
--- Create test table
+-- Create test table with same structure
 CREATE TABLE users_test LIKE users;
 INSERT INTO users_test SELECT * FROM users;
 
 -- Test your query
-UPDATE users_test SET ... WHERE ...;
+UPDATE users_test SET is_active = 0 WHERE last_login < DATE_SUB(NOW(), INTERVAL 90 DAY);
 
--- Verify results
-SELECT * FROM users_test WHERE ...;
+-- Verify results before applying to production
+SELECT username, email, last_login, is_active FROM users_test 
+WHERE last_login < DATE_SUB(NOW(), INTERVAL 90 DAY);
 ```
 
 #### 3. Use Transactions for Multiple Operations
 ```sql
 START TRANSACTION;
 -- Multiple related operations
-UPDATE inventory SET quantity = quantity - 10 WHERE product_id = 123;
-INSERT INTO inventory_log (product_id, change_amount, reason) VALUES (123, -10, 'Sale');
+UPDATE products SET stock_quantity = stock_quantity - 10 WHERE id = 1;
+INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price) 
+VALUES (1, 1, 10, 99.99, 999.90);
+UPDATE orders SET total_amount = total_amount + 999.90 WHERE id = 1;
 COMMIT;
 ```
 
@@ -683,14 +762,15 @@ CREATE TABLE users_backup_20240106 AS SELECT * FROM users;
 -- Test: Ensure user registration works correctly
 START TRANSACTION;
 
--- Register new user
-INSERT INTO users (username, email, password_hash)
-VALUES ('testuser123', 'test123@example.com', 'testhash');
+-- Register new user with all fields
+INSERT INTO users (username, email, password_hash, first_name, last_name, phone)
+VALUES ('testuser123', 'test123@example.com', 'testhash', 'Test', 'User', '555-TEST');
 
 SET @user_id = LAST_INSERT_ID();
 
--- Verify user created
-SELECT * FROM users WHERE id = @user_id;
+-- Verify user created with defaults
+SELECT id, username, email, is_active, created_at 
+FROM users WHERE id = @user_id;
 
 -- Cleanup (in test environment)
 ROLLBACK;  -- Or DELETE for persistent test
@@ -749,23 +829,29 @@ UPDATE users SET is_active = FALSE;  -- Error: safe update mode
 
 #### Pitfall 2: Not Handling NULL in JOINs
 ```sql
--- Problem: Missing results due to NULL
-SELECT * FROM users u
-INNER JOIN profiles p ON u.profile_id = p.id;  -- Misses users without profiles
+-- Problem: Missing results due to NULL category_id
+SELECT * FROM products p
+INNER JOIN categories c ON p.category_id = c.id;  -- Misses products without categories
 
 -- Solution: Use LEFT JOIN
-SELECT * FROM users u
-LEFT JOIN profiles p ON u.profile_id = p.id;
+SELECT p.*, COALESCE(c.name, 'Uncategorized') as category_name
+FROM products p
+LEFT JOIN categories c ON p.category_id = c.id;
 ```
 
 #### Pitfall 3: Ambiguous Column Names
 ```sql
--- Problem: Ambiguous column 'id'
-SELECT id, name FROM users
+-- Problem: Ambiguous column 'id' and 'created_at'
+SELECT id, created_at FROM users
 INNER JOIN orders ON users.id = orders.user_id;
 
--- Solution: Use aliases
-SELECT u.id, u.name, o.id AS order_id
+-- Solution: Use table prefixes or aliases
+SELECT 
+    u.id AS user_id, 
+    u.username, 
+    u.created_at AS user_created,
+    o.id AS order_id,
+    o.created_at AS order_created
 FROM users u
 INNER JOIN orders o ON u.id = o.user_id;
 ```
