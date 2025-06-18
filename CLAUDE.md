@@ -55,7 +55,23 @@ For the presentation, you mainly need:
 1. **Course materials**: `/sql-module/` directory
 2. **Presentations**: `/sql-module/presentations/`
 3. **Sample code**: Working Playwright tests in `/tests/`
-4. **Database**: Already configured remote MySQL instance
+4. **Database**: Local MySQL with baseline backup available
+
+#### Database Management
+**Backup Current State:**
+```bash
+node scripts/backup-database.js
+```
+
+**Restore to Clean State:**
+```bash
+node scripts/restore-database.js --baseline --yes
+```
+
+**Check API-Database Sync:**
+```bash
+node scripts/sync-api-database.js --check-only
+```
 
 ### Progress Tracking
 - ✅ MCP Server Recommendations completed

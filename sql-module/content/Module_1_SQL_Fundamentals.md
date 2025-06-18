@@ -284,6 +284,25 @@ SELECT * FROM customers WHERE address LIKE '%New York%';
 --   'PHN___' matches exactly 6 characters starting with 'PHN'
 SELECT * FROM products WHERE sku LIKE 'LAP___';  -- Matches LAP001, LAP002
 SELECT * FROM products WHERE sku LIKE 'PHN___';  -- Matches PHN001, PHN002, PHN003
+
+
+description '%Clothing'
+
+SELECT id, name, description, parent_id FROM categories WHERE id BETWEEN 2 AND 10 AND parent_id IS NOT NULL AND description LIKE '%Clothing' ORDER BY description ASC;
+
+AND description '%Clothing'
+
+description LIKE '%Clothing'
+
+
+I THINK MORE THE VALUES WE'RE SEARCHING FOR IN THIS TABLE IS NOT THERE IS FOR WHAT WE'RE SEARCHING FOR, FOR EXAMPLE IF I'M LOOKING FOR WE GET BLABLABLABLA EVERYTHING THAT IS IN THE TABLE THERE
+
+SELECT id, name, description, parent_id FROM categories WHERE id BETWEEN 2 AND 10 AND parent_id IS NOT NULL AND description LIKE '%clothing%' ORDER BY ID DESC, description ASC;
+
+
+/\
+/ \
+/  \
 ```
 
 #### The IN Operator
