@@ -608,6 +608,97 @@ app.get('/internal-error', (req, res) => {
     res.status(500).json({ error: 'Internal Server Error (Simulated)' });
 });
 
+// =============================================================================
+// GEMINI CREATIVE ENDPOINTS
+// =============================================================================
+
+// GET potential escape risks
+app.get('/api/creative/escape-risks', async (req, res) => {
+    try {
+        const query = `
+            WITH AtRiskHabitats AS (
+                SELECT habitat_id
+                FROM habitats
+                WHERE habitat_type = 'Outdoor' OR (temp_range_high - temp_range_low) > 20
+            )
+            SELECT
+                a.name AS AnimalName,
+                a.species,
+                a.weight_kg,
+                h.habitat_name AS HabitatName,
+                h.habitat_type
+            FROM
+                animals a
+            JOIN
+                habitats h ON a.habitat_id = h.habitat_id
+            WHERE
+                a.weight_kg < 10
+                AND a.habitat_id IN (SELECT habitat_id FROM AtRiskHabitats);
+        `;
+        const results = await executeQuery(query);
+        res.status(200).json(results);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch escape risks' });
+    }
+});
+
+// GET potential animal friends
+app.get('/api/creative/friendship-candidates', async (req, res) => {
+    try {
+        const query = `
+            SELECT
+                a1.name AS Animal1,
+                a1.species,
+                h1.habitat_name AS Habitat1,
+                a2.name AS Animal2,
+                h2.habitat_name AS Habitat2
+            FROM
+                animals a1
+            JOIN
+                animals a2 ON a1.species = a2.species AND a1.animal_id < a2.animal_id
+            JOIN
+                habitats h1 ON a1.habitat_id = h1.habitat_id
+            JOIN
+                habitats h2 ON a2.habitat_id = h2.habitat_id
+            WHERE
+                a1.habitat_id != a2.habitat_id;
+        `;
+        const results = await executeQuery(query);
+        res.status(200).json(results);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch friendship candidates' });
+    }
+});
+
+// GET the "A-Team"
+app.get('/api/creative/a-team', async (req, res) => {
+    try {
+        const query = `
+            SELECT
+                vet.first_name AS Veterinarian,
+                trainer.first_name AS Trainer,
+                caretaker.first_name AS Caretaker
+            FROM
+                staff vet
+            CROSS JOIN
+                staff trainer
+            CROSS JOIN
+                staff caretaker
+            WHERE
+                vet.role = 'Veterinarian'
+                AND trainer.role = 'Trainer'
+                AND caretaker.role = 'Caretaker'
+                AND vet.staff_id != trainer.staff_id
+                AND vet.staff_id != caretaker.staff_id
+                AND trainer.staff_id != caretaker.staff_id;
+        `;
+        const results = await executeQuery(query);
+        res.status(200).json(results);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to assemble the A-Team' });
+    }
+});
+
 // Catch-all for undefined routes
 app.use((req, res) => {
     res.status(404).json({ error: `Cannot ${req.method} ${req.path}` });

@@ -6,6 +6,8 @@
 
 In real-world applications, data is distributed across multiple related tables. Understanding how to work with these relationships is crucial for effective testing.
 
+
+
 ### Types of Relationships
 
 #### 1. One-to-Many (Most Common)
@@ -115,11 +117,11 @@ INNER JOIN products p ON oi.product_id = p.id;
 
 ### LEFT JOIN (LEFT OUTER JOIN)
 
-Returns all rows from the left table and matched rows from the right table. NULL for non-matching right side.
+Returns ALL!!!!!! rows from the left table and matched rows from the right table. NULL for non-matching right side.
 
 #### Example: All Users, With or Without Orders
 
-Let's build this up step by step:
+Let's build this up step by step:1 | johndoe  
 
 ```sql
 -- First, a simple LEFT JOIN to see all users and their orders
@@ -129,7 +131,7 @@ SELECT
     orders.order_number,
     orders.total_amount
 FROM users
-LEFT JOIN orders ON users.id = orders.user_id
+LEFT JOIN orders ON users.id(4)= orders.user_id
 ORDER BY users.username;
 
 -- Now with aliases for cleaner code
@@ -139,7 +141,7 @@ SELECT
     o.order_number,
     o.total_amount
 FROM users u
-LEFT JOIN orders o ON u.id = o.user_id
+LEFT JOIN orders o ON u.id(4) = o.user_id(4)
 ORDER BY u.username;
 
 -- Advanced: Count orders per user (including users with no orders)
@@ -189,7 +191,7 @@ WHERE oi.id IS NULL;
 
 ### RIGHT JOIN (RIGHT OUTER JOIN)
 
-Returns all rows from the right table and matched rows from the left table. Less commonly used than LEFT JOIN.
+Returns ALL!!!!!! rows from the right table and matched rows from the left table. Less commonly used than LEFT JOIN.
 
 ```sql
 -- All orders with user information (even if user deleted)
@@ -256,6 +258,7 @@ Joining a table to itself, useful for hierarchical data.
 -- Find categories and their parent categories
 SELECT 
     c1.name AS category,
+-- Find products in the same category
     c2.name AS parent_category
 FROM categories c1
 LEFT JOIN categories c2 ON c1.parent_id = c2.id;
