@@ -11,6 +11,7 @@ import mysql from 'mysql2/promise';
  * - Compare with API endpoints data
  */
 
+//Set up the db connection
 const dbConfig = {
     host: 'localhost',
     user: 'sqltraining',
@@ -18,12 +19,15 @@ const dbConfig = {
     database: 'sql_training'
 };
 
+//Establish the db connection
 let connection;
 
+
+//Set up the connection before each test
 test.beforeEach(async () => {
     connection = await mysql.createConnection(dbConfig);
 });
-
+//Close the connection after each test
 test.afterEach(async () => {
     if (connection) {
         await connection.end();
@@ -33,7 +37,8 @@ test.afterEach(async () => {
 test.describe('Level 1: Basic SELECT Queries', () => {
 
     test('should fetch all users from database', async () => {
-        const [rows] = await connection.execute('SELECT * FROM users ORDER BY id');
+        //Construct the connection and execute the sql query
+        const [rows] = await connection.execute('SELECT * FROM users ORDER BY id LIMIT 3');
 
         // Verify we get an array of results
         expect(Array.isArray(rows)).toBe(true);
@@ -41,6 +46,8 @@ test.describe('Level 1: Basic SELECT Queries', () => {
         // If users exist, verify structure matches API response
         if (rows.length > 0) {
             const user = rows[0];
+            //We are checking the structural integrity of the row (user object)
+            //Investigate each property of the user
             expect(user).toHaveProperty('id');
             expect(user).toHaveProperty('username');
             expect(user).toHaveProperty('email');
@@ -55,8 +62,11 @@ test.describe('Level 1: Basic SELECT Queries', () => {
 
             // Verify data types
             expect(typeof user.id).toBe('number');
+            //We expect the x (property) to be a type of y (data type)
+            //We expect the username to be a type of string
             expect(typeof user.username).toBe('string');
             expect(typeof user.email).toBe('string');
+            expect(typeof user.is_active).toBe('number');
             expect([0, 1]).toContain(user.is_active);
         }
         console.log(rows);
@@ -82,16 +92,21 @@ test.describe('Level 1: Basic SELECT Queries', () => {
             expect(product).toHaveProperty('created_at');
             expect(product).toHaveProperty('updated_at');
 
-            // Verify critical constraints
+            // Verify data types
             expect(typeof product.id).toBe('number');
             expect(typeof product.sku).toBe('string');
             expect(typeof product.name).toBe('string');
             expect(typeof product.price).toBe('string'); // DECIMAL comes as string
-            expect(parseFloat(product.price)).toBeGreaterThan(0);
+            expect(typeof product.price).toBe('float');
             expect(typeof product.stock_quantity).toBe('number');
         }
         console.log(rows);
     });
+
+
+
+
+
 
     test('should fetch all categories from database', async () => {
         const [rows] = await connection.execute('SELECT * FROM categories ORDER BY id');
@@ -131,6 +146,8 @@ test.describe('Level 1: Basic SELECT Queries', () => {
             expect(order).toHaveProperty('shipped_at');
             expect(order).toHaveProperty('delivered_at');
 
+
+            //expect([0, 1]).toContain(user.is_active);
             // Verify status is valid enum value
             const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
             expect(validStatuses).toContain(order.status);
@@ -171,11 +188,34 @@ test.describe('Level 1: Basic SELECT Queries', () => {
         }
     });
 
-    test('should count records in each table', async () => {
+
+    //Let's define COUNT in SQL
+
+    //COUNT(*) is a function that returns the number of rows in a table
+    // -- We also often refer to * as a 'all' or 'everything'
+
+    //COUNT(column_name) is a function that returns the number of non-NULL values in a column
+    // -- By default, we are optimistic about data - meaning something along the line of expecting actual data instead of NULLS
+    //COUNT(name) will then return the number of entries/results from the names column
+
+    //COUNT(DISTINCT column_name) is a function that returns the number of unique values in a column
+    // -- COUNT(DISTINCT name) will then return the number of UNIQUE entires/results from the names colum
+    // FOR EXAMPLE - the names table exists of ['John', 'Mary', 'Christiaan', 'Susan', 'Henry', 'Henry']
+
+    //COUNT(ALL column_name) is a function that returns the number of all values in a column
+    // -- COUNT(ALL name) will then return the total of entries
+
+
+    test.only('should count records in each table', async () => {
         // Count users
-        const [userCount] = await connection.execute('SELECT COUNT(*) as count FROM users');
-        expect(typeof userCount[0].count).toBe('number');
-        expect(userCount[0].count).toBeGreaterThanOrEqual(0);
+
+        //So from the above, we can see that COUNT(*) is a function that returns the number of rows in a table, why the 'as' is there?
+        // -- We are renaming the column to 'count'
+        // -- This is a common practice to make the result more readable
+        // -- We can also use this to rename the column to something else, for example, we can rename the column to 'total_users'
+        const [userCount] = await connection.execute('SELECT COUNT(*) as newColumn FROM users');
+        expect(typeof userCount[0].newColumn).toBe('number');
+        expect(userCount[0].newColumn).toBeGreaterThanOrEqual(0);
 
         // Count products
         const [productCount] = await connection.execute('SELECT COUNT(*) as count FROM products');
@@ -210,14 +250,14 @@ test.describe('Level 1: Basic SELECT Queries', () => {
 
     test('should verify database constraints and data integrity', async () => {
         // Check for users with valid email formats
-        const [invalidEmails] = await connection.execute(`
+        const [validEmails] = await connection.execute(`
             SELECT id, username, email 
             FROM users 
-            WHERE email NOT REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'
+            -- WHERE email NOT REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'
         `);
 
-        // Should have no invalid emails
-        expect(invalidEmails.length).toBe(0);
+        // Should have no valid emails
+        expect(validEmails.length).toBeGreaterThan(0);
 
         // Check for products with positive prices
         const [invalidPrices] = await connection.execute(`

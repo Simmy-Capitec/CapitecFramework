@@ -1,5 +1,5 @@
 import { test, expect } from '../src/fixtures/testFixtures';
-import productData from '../src/data/products.json';
+import productData from '../src/data/testData.json' assert { type: 'json' };
 
 for (const laptop of productData.laptop) {
     test(`Shopping flow with ${laptop.name}`, async ({ homepage, productPage, cartPage, page }) => {
