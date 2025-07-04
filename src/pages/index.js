@@ -1,17 +1,14 @@
-
-//The index.js file works as a central hub for importing/exporting page objects
-//This makes it easier to import mulitple page objects in our tests
-import SimpleHomePage from "./demo/SimpleHomePage";
-import SimpleProductPage from "./demo/simpleProductPage";
-import SimpleCartPage from "./demo/simpleCartPage";
-
-//This export statement makes all these classes available to other files
-// When another file imports from this index, it can access any of these
+// Export all page objects
+import BasePage from './BasePage.js';
+import LoginPage from './LoginPage.js';
+import ProductsPage from './ProductsPage.js';
+import CartPage from './CartPage.js';
+import CheckoutPage from './CheckoutPage.js';
 
 export {
-
-    SimpleHomePage,
-    SimpleProductPage,
-    SimpleCartPage
-
-};
+    BasePage,
+    LoginPage,
+    ProductsPage,
+    CartPage,
+    CheckoutPage
+}; 

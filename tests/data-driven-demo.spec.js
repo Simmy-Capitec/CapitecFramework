@@ -1,44 +1,32 @@
 import { test, expect } from '../src/fixtures/testFixtures';
-import productData from '../src/data/products.js';
+import productData from '../src/data/testData.json' assert { type: 'json' };
 
+for (const laptop of productData.laptop) {
+    test(`Shopping flow with ${laptop.name}`, async ({ homepage, productPage, cartPage, page }) => {
+        // Go to the home page
+        await homepage.goToHomePage();
 
+        // Navigate to the laptop category
+        await homepage.clickLaptopCategory();
+        await page.waitForTimeout(2000)
 
-for (const laptop of productData.laptops) {
-    test(`Shopping flow with ${laptop.name}`, async ({ homePage, productPage, cartPage, page }) => {
+        // Find and click the product based on the laptop name
+        const productLink = await productPage.getProductLink(laptop.name);
+        await productLink.click();
 
-        //Step 1: Go to the home page
-        await homePage.goToHomePage();
+        // Add the product to the cart
+        await productPage.addToCart(); // Assuming a method to add the product to the cart
 
-        //Step 2: Click on Laptops Category
-        await homePage.clickLaptopsCategory();
-        await page.waitForTimeout(2000);
+        // Go to the cart page
+        await homepage.goToCartPage();
 
-        //Step 3
-        await homePage.clickProduct(laptop.name);
-        await page.waitForTimeout(2000);
+        // Verify the product is in the cart
+        const cartProduct = await cartPage.getProductInCart(laptop.name); // Assuming a method to get the product in the cart
+        expect(cartProduct).toBeDefined();
+        expect(cartProduct.name).toBe(laptop.name);
 
-        //Verify we're on the right page
-        const title = await productPage.getProductTitle();
-        expect(title).toContain(laptop.name);
-
-        console.log(laptop);
-
-        //Step 4: Add to the cart
-        await productPage.addToCart();
-        await page.waitForTimeout(2000);
-
-        //Step 5: Go to cart
-        await homePage.goToCart();
-        await page.waitForTimeout(10000);
-
-        //Step 7: Verify product is in cart
-        //We check if our product is in the cart
-        const isInCart = await cartPage.hasProduct(laptop.name);
-        await page.waitForTimeout(1000);
-        expect(isInCart).toBeTruthy();
-
+        // Verify cart total (assuming you want to check the total)
+        const cartTotal = await cartPage.getCartTotal(); // Assuming a method for cart total
+        expect(cartTotal).toBe(laptop.price); // Assuming the laptop's price is the expected total
     });
 }
-
-
-

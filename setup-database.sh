@@ -1,0 +1,15 @@
+#!/bin/bash
+
+echo "Setting up SQL Training Database..."
+echo "Please run the following command manually:"
+echo ""
+echo "sudo mysql < /home/christiaan/Documents/CapitecFramework/sql-module/setup/clean-setup.sql"
+echo ""
+echo "Then verify with:"
+echo "mysql -u sqltraining -p sql_training"
+echo "Password: training123"
+echo ""
+echo "Test queries:"
+echo "SHOW TABLES;"
+echo "SELECT COUNT(*) FROM users;"
+echo "SELECT COUNT(*) FROM products;"

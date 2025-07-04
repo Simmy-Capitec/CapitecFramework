@@ -38,8 +38,6 @@ test.describe('Login Tests', () => {
         // Attempt login with locked out user
         await loginPage.login(username, password);
 
-
-
         // Verify error message
         const errorMessage = await loginPage.getErrorMessage();
         expect(errorMessage).toContain('Sorry, this user has been locked out');

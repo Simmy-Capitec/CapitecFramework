@@ -1,54 +1,39 @@
-// Simple Express API server for teaching CRUD and status codes
+// E-commerce API server aligned with MySQL database schema
 import express from 'express';
+import mysql from 'mysql2/promise';
 const app = express();
 const PORT = 3000;
-const SECRET_TOKEN = 'my-secret-token'; // Simple token for demo auth
+const SECRET_TOKEN = 'my-secret-token';
 
 app.use(express.json());
 
-// In-memory data store
-let posts = [
-    { id: 1, userId: 1, title: 'First Post', body: 'This is the first post.', published: true, tags: ['news', 'tech'], metadata: { views: 150 } },
-    { id: 2, userId: 2, title: 'Second Post', body: 'Another interesting article.', published: false, tags: ['lifestyle'], metadata: { views: 50 } },
-    { id: 3, userId: 1, title: 'Third Post about Tech', body: 'Diving deep into JavaScript.', published: true, tags: ['tech', 'code'], metadata: { views: 300 } },
-    { id: 4, userId: 3, title: 'Travel Adventures', body: 'Exploring the mountains.', published: true, tags: ['travel', 'adventure'], metadata: { views: 220 } },
-    { id: 5, userId: 2, title: 'Cooking Tips', body: 'Easy recipes for beginners.', published: false, tags: ['food', 'cooking'], metadata: { views: 95 } },
-    // Problematic Data:
-    { id: 6, userId: 99, title: 'Post by Non-existent User', body: 'This user ID does not exist in the users list.', published: true, tags: ['orphan'], metadata: {} },
-    { id: 7, userId: 1, title: 'Post with Invalid Tag Type', body: 'Tags should be an array.', published: true, tags: 'invalid-tag', metadata: { views: 10 } }, // tags should be array
-    { id: 8, userId: 2, title: null, body: 'Post with null title', published: true, tags: ['data-issue'], metadata: { views: 5 } }, // title is null
-    { id: 9, userId: 3, body: 'Post missing title', published: false, tags: ['incomplete'], metadata: {} }, // title field missing
-];
+// Database connection
+const dbConfig = {
+    host: 'localhost',
+    user: 'sqltraining',
+    password: 'training123',
+    database: 'sql_training',
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+};
 
-let users = [
-    { id: 1, name: 'Alice', email: 'alice@example.com' },
-    { id: 2, name: 'Bob', email: 'bob@example.com' },
-    { id: 3, name: 'Charlie', email: 'charlie@example.com' },
-    // Problematic Data:
-    { id: 4, name: 'David', email: 'david-invalid-email' }, // Invalid email format
-    { id: 5, email: 'eve@example.com' }, // Missing name
-];
-
-let comments = [
-    { id: 101, postId: 1, userId: 2, text: 'Great article!' },
-    { id: 102, postId: 1, userId: 3, text: 'Very informative, thanks.' },
-    { id: 103, postId: 3, userId: 1, text: 'Nice code examples.' },
-    { id: 104, postId: 4, userId: 2, text: 'Beautiful pictures!' },
-    // Problematic Data:
-    { id: 105, postId: 99, userId: 1, text: 'Comment on non-existent post.' }, // postId 99 doesn't exist
-    { id: 106, postId: 1, userId: 99, text: 'Comment by non-existent user.' }, // userId 99 doesn't exist
-    { id: 107, postId: 2, userId: 3 }, // Missing text field
-    { id: 108, postId: 5, userId: 1, text: null }, // text is null
-];
+const pool = mysql.createPool(dbConfig);
 
 // Helper Functions
-const findPostById = (id) => posts.find(p => p.id === Number(id));
-const findUserById = (id) => users.find(u => u.id === Number(id));
-const findCommentById = (id) => comments.find(c => c.id === Number(id));
-const getNextId = (collection) => collection.length ? Math.max(...collection.map(item => item.id)) + 1 : 1;
+const executeQuery = async (query, params = []) => {
+    try {
+        const [results] = await pool.execute(query, params);
+        return results;
+    } catch (error) {
+        console.error('Database query error:', error);
+        throw error;
+    }
+};
+
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-// Middleware for simulated authentication
+// Middleware for authentication
 const authenticate = (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -58,247 +43,549 @@ const authenticate = (req, res, next) => {
     if (token !== SECRET_TOKEN) {
         return res.status(403).json({ error: 'Forbidden: Invalid token' });
     }
-    req.user = { id: 'authenticated_user', roles: ['admin'] }; // Simulate user context
+    req.user = { id: 'authenticated_user', roles: ['admin'] };
     next();
 };
 
-// GET all posts
-app.get('/posts', (req, res) => {
-    let filteredPosts = [...posts];
-
-    // Filtering by userId
-    if (req.query.userId) {
-        const userId = Number(req.query.userId);
-        filteredPosts = filteredPosts.filter(p => p.userId === userId);
-    }
-
-    // Filtering by published status
-    if (req.query.published) {
-        const published = req.query.published.toLowerCase() === 'true';
-        filteredPosts = filteredPosts.filter(p => p.published === published);
-    }
-
-    // Sorting
-    if (req.query.sortBy) {
-        const sortBy = req.query.sortBy;
-        const order = req.query.order === 'desc' ? -1 : 1;
-        filteredPosts.sort((a, b) => {
-            // Handle potential null/undefined during sort
-            const valA = a[sortBy] ?? ''; // Default to empty string if null/undefined
-            const valB = b[sortBy] ?? '';
-            if (valA < valB) return -1 * order;
-            if (valA > valB) return 1 * order;
-            return 0;
-        });
-    }
-
-    res.status(200).json(filteredPosts);
-});
-
-// GET a single post by id
-app.get('/posts/:id', (req, res) => {
-    const post = findPostById(req.params.id);
-    if (!post) return res.status(404).json({ error: 'Post not found' });
-    res.status(200).json(post);
-});
-
-// POST create a new post
-app.post('/posts', (req, res) => {
-    const { userId, title, body, published = false, tags = [], metadata = {} } = req.body;
-
-    // Basic Validation
-    if (!userId || !title || !body) {
-        return res.status(400).json({ error: 'Missing required fields: userId, title, body' });
-    }
-    if (typeof title !== 'string' || title.length < 3) {
-        return res.status(400).json({ error: 'Validation Error: Title must be a string of at least 3 characters.' });
-    }
-    if (!findUserById(userId)) {
-        return res.status(400).json({ error: `Validation Error: User with id ${userId} does not exist.` });
-    }
-    if (tags && !Array.isArray(tags)) {
-        return res.status(400).json({ error: 'Validation Error: tags must be an array.' });
-    }
-
-    const newPost = {
-        id: getNextId(posts),
-        userId: Number(userId),
-        title,
-        body,
-        published: Boolean(published),
-        tags: Array.isArray(tags) ? tags : [],
-        metadata: typeof metadata === 'object' && metadata !== null ? metadata : {}
-    };
-    posts.push(newPost);
-    res.status(201).json(newPost);
-});
-
-// PUT update a post
-app.put('/posts/:id', (req, res) => {
-    const postId = Number(req.params.id);
-    const postIndex = posts.findIndex(p => p.id === postId);
-    if (postIndex === -1) return res.status(404).json({ error: 'Post not found' });
-
-    const { userId, title, body, published, tags, metadata } = req.body;
-
-    // Validation (similar to POST)
-    if (!userId || !title || !body || published === undefined || !tags || !metadata) {
-        return res.status(400).json({ error: 'Missing fields for full update: userId, title, body, published, tags, metadata' });
-    }
-    if (typeof title !== 'string' || title.length < 3) {
-        return res.status(400).json({ error: 'Validation Error: Title must be a string of at least 3 characters.' });
-    }
-    if (!findUserById(userId)) {
-        return res.status(400).json({ error: `Validation Error: User with id ${userId} does not exist.` });
-    }
-    if (tags && !Array.isArray(tags)) {
-        return res.status(400).json({ error: 'Validation Error: tags must be an array.' });
-    }
-
-    const updatedPost = {
-        id: postId,
-        userId: Number(userId),
-        title,
-        body,
-        published: Boolean(published),
-        tags: Array.isArray(tags) ? tags : [],
-        metadata: typeof metadata === 'object' && metadata !== null ? metadata : {}
-    };
-    posts[postIndex] = updatedPost;
-    res.status(200).json(updatedPost);
-});
-
-// PATCH partially update a post
-app.patch('/posts/:id/publish', (req, res) => {
-    const post = findPostById(req.params.id);
-    if (!post) return res.status(404).json({ error: 'Post not found' });
-
-    const { published } = req.body;
-    if (typeof published !== 'boolean') {
-        return res.status(400).json({ error: 'Invalid field: published must be a boolean' });
-    }
-    post.published = published;
-    res.status(200).json(post);
-});
-
-// DELETE a post
-app.delete('/posts/:id', (req, res) => {
-    const postId = Number(req.params.id);
-    const index = posts.findIndex(p => p.id === postId);
-    if (index === -1) return res.status(404).json({ error: 'Post not found' });
-
-    // Cascade delete comments associated with this post
-    comments = comments.filter(c => c.postId !== postId);
-
-    posts.splice(index, 1);
-    res.status(204).send(); // No content on successful deletion
-});
+// =============================================================================
+// USERS ENDPOINTS
+// =============================================================================
 
 // GET all users
-app.get('/users', (req, res) => {
-    res.status(200).json(users);
+app.get('/users', async (req, res) => {
+    try {
+        const users = await executeQuery('SELECT id, username, email, first_name, last_name, phone, created_at, is_active, last_login FROM users ORDER BY id');
+        res.status(200).json(users);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch users' });
+    }
 });
 
-// GET a single user by id
-app.get('/users/:id', (req, res) => {
-    const user = findUserById(req.params.id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.status(200).json(user);
+// GET single user by id
+app.get('/users/:id', async (req, res) => {
+    try {
+        const userId = Number(req.params.id);
+        const users = await executeQuery('SELECT id, username, email, first_name, last_name, phone, created_at, is_active, last_login FROM users WHERE id = ?', [userId]);
+        
+        if (users.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        res.status(200).json(users[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch user' });
+    }
 });
 
-// POST create a new user
-app.post('/users', (req, res) => {
-    const { name, email } = req.body;
-    if (!name || !email) {
-        return res.status(400).json({ error: 'Missing required fields: name, email' });
+// POST create new user
+app.post('/users', async (req, res) => {
+    try {
+        const { username, email, password_hash, first_name, last_name, phone } = req.body;
+        
+        if (!username || !email || !password_hash) {
+            return res.status(400).json({ error: 'Missing required fields: username, email, password_hash' });
+        }
+        
+        if (!isValidEmail(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+        
+        // Check for duplicate username or email
+        const existing = await executeQuery('SELECT id FROM users WHERE username = ? OR email = ?', [username, email]);
+        if (existing.length > 0) {
+            return res.status(400).json({ error: 'Username or email already exists' });
+        }
+        
+        const result = await executeQuery(
+            'INSERT INTO users (username, email, password_hash, first_name, last_name, phone) VALUES (?, ?, ?, ?, ?, ?)',
+            [username, email, password_hash, first_name || null, last_name || null, phone || null]
+        );
+        
+        const newUser = await executeQuery('SELECT id, username, email, first_name, last_name, phone, created_at FROM users WHERE id = ?', [result.insertId]);
+        res.status(201).json(newUser[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create user' });
     }
-    if (!isValidEmail(email)) {
-        return res.status(400).json({ error: 'Validation Error: Invalid email format.' });
-    }
-    // Check if email already exists (simple example)
-    if (users.some(u => u.email === email)) {
-        return res.status(400).json({ error: 'Conflict: Email already in use.' }); // 409 Conflict might be better here
-    }
-
-    const newUser = { id: getNextId(users), name, email };
-    users.push(newUser);
-    res.status(201).json(newUser);
 });
 
-// PUT update a user
-app.put('/users/:id', (req, res) => {
-    const userId = Number(req.params.id);
-    const userIndex = users.findIndex(u => u.id === userId);
-    if (userIndex === -1) return res.status(404).json({ error: 'User not found' });
-
-    const { name, email } = req.body;
-    if (!name || !email) {
-        return res.status(400).json({ error: 'Missing required fields: name, email' });
+// PUT update user
+app.put('/users/:id', async (req, res) => {
+    try {
+        const userId = Number(req.params.id);
+        const { username, email, first_name, last_name, phone } = req.body;
+        
+        if (!username || !email) {
+            return res.status(400).json({ error: 'Missing required fields: username, email' });
+        }
+        
+        if (!isValidEmail(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+        
+        // Check if user exists
+        const existingUser = await executeQuery('SELECT id FROM users WHERE id = ?', [userId]);
+        if (existingUser.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        // Check for duplicate username/email (excluding current user)
+        const duplicates = await executeQuery('SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ?', [username, email, userId]);
+        if (duplicates.length > 0) {
+            return res.status(400).json({ error: 'Username or email already exists' });
+        }
+        
+        await executeQuery(
+            'UPDATE users SET username = ?, email = ?, first_name = ?, last_name = ?, phone = ? WHERE id = ?',
+            [username, email, first_name || null, last_name || null, phone || null, userId]
+        );
+        
+        const updatedUser = await executeQuery('SELECT id, username, email, first_name, last_name, phone, created_at FROM users WHERE id = ?', [userId]);
+        res.status(200).json(updatedUser[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update user' });
     }
-    if (!isValidEmail(email)) {
-        return res.status(400).json({ error: 'Validation Error: Invalid email format.' });
-    }
-    // Check if email exists for *another* user
-    if (users.some(u => u.email === email && u.id !== userId)) {
-        return res.status(400).json({ error: 'Conflict: Email already in use by another user.' });
-    }
-
-    const updatedUser = { id: userId, name, email };
-    users[userIndex] = updatedUser;
-    res.status(200).json(updatedUser);
 });
 
-// DELETE a user
-app.delete('/users/:id', (req, res) => {
-    const userId = Number(req.params.id);
-    const index = users.findIndex(u => u.id === userId);
-    if (index === -1) return res.status(404).json({ error: 'User not found' });
-
-    // Optional: Handle user deletion impact (e.g., nullify their comments/posts?)
-    // For simplicity, we'll just delete the user here.
-    // posts = posts.map(p => p.userId === userId ? { ...p, userId: null } : p); // Example: Nullify userId in posts
-    // comments = comments.map(c => c.userId === userId ? { ...c, userId: null } : c); // Example: Nullify userId in comments
-
-    users.splice(index, 1);
-    res.status(204).send();
+// DELETE user
+app.delete('/users/:id', async (req, res) => {
+    try {
+        const userId = Number(req.params.id);
+        
+        const result = await executeQuery('DELETE FROM users WHERE id = ?', [userId]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete user' });
+    }
 });
 
-// GET comments for a post
-app.get('/posts/:postId/comments', (req, res) => {
-    const postId = Number(req.params.postId);
-    // We don't strictly need to check if post exists here if we just want comments for that ID
-    // if (!findPostById(postId)) {
-    //     return res.status(404).json({ error: 'Post not found' });
-    // }
-    const postComments = comments.filter(c => c.postId === postId);
-    res.status(200).json(postComments); // Will return empty array if post has no comments or doesn't exist
+// =============================================================================
+// CATEGORIES ENDPOINTS
+// =============================================================================
+
+// GET all categories
+app.get('/categories', async (req, res) => {
+    try {
+        const categories = await executeQuery('SELECT * FROM categories ORDER BY id');
+        res.status(200).json(categories);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch categories' });
+    }
 });
 
-// POST add a comment to a post
-app.post('/posts/:postId/comments', (req, res) => {
-    const postId = Number(req.params.postId);
-    if (!findPostById(postId)) {
-        return res.status(400).json({ error: `Validation Error: Post with id ${postId} does not exist.` });
+// GET single category
+app.get('/categories/:id', async (req, res) => {
+    try {
+        const categoryId = Number(req.params.id);
+        const categories = await executeQuery('SELECT * FROM categories WHERE id = ?', [categoryId]);
+        
+        if (categories.length === 0) {
+            return res.status(404).json({ error: 'Category not found' });
+        }
+        
+        res.status(200).json(categories[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch category' });
     }
-    const { userId, text } = req.body;
-    if (!userId || !text) {
-        return res.status(400).json({ error: 'Missing fields: userId, text' });
-    }
-    if (!findUserById(userId)) {
-        return res.status(400).json({ error: `Validation Error: User with id ${userId} does not exist.` });
-    }
-    if (typeof text !== 'string' || text.trim().length === 0) {
-        return res.status(400).json({ error: 'Validation Error: Comment text cannot be empty.' });
-    }
-
-    const newComment = { id: getNextId(comments), postId, userId: Number(userId), text };
-    comments.push(newComment);
-    res.status(201).json(newComment);
 });
+
+// POST create category
+app.post('/categories', async (req, res) => {
+    try {
+        const { name, description, parent_id } = req.body;
+        
+        if (!name) {
+            return res.status(400).json({ error: 'Missing required field: name' });
+        }
+        
+        const result = await executeQuery(
+            'INSERT INTO categories (name, description, parent_id) VALUES (?, ?, ?)',
+            [name, description || null, parent_id || null]
+        );
+        
+        const newCategory = await executeQuery('SELECT * FROM categories WHERE id = ?', [result.insertId]);
+        res.status(201).json(newCategory[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create category' });
+    }
+});
+
+// =============================================================================
+// PRODUCTS ENDPOINTS
+// =============================================================================
+
+// GET all products
+app.get('/products', async (req, res) => {
+    try {
+        let query = `
+            SELECT p.*, c.name as category_name 
+            FROM products p 
+            LEFT JOIN categories c ON p.category_id = c.id 
+            WHERE 1=1
+        `;
+        const params = [];
+        
+        // Filter by category
+        if (req.query.category_id) {
+            query += ' AND p.category_id = ?';
+            params.push(Number(req.query.category_id));
+        }
+        
+        // Filter by active status
+        if (req.query.is_active !== undefined) {
+            query += ' AND p.is_active = ?';
+            params.push(req.query.is_active === 'true' ? 1 : 0);
+        }
+        
+        // Search by name
+        if (req.query.search) {
+            query += ' AND p.name LIKE ?';
+            params.push(`%${req.query.search}%`);
+        }
+        
+        query += ' ORDER BY p.id';
+        
+        const products = await executeQuery(query, params);
+        res.status(200).json(products);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch products' });
+    }
+});
+
+// GET single product
+app.get('/products/:id', async (req, res) => {
+    try {
+        const productId = Number(req.params.id);
+        const products = await executeQuery(`
+            SELECT p.*, c.name as category_name 
+            FROM products p 
+            LEFT JOIN categories c ON p.category_id = c.id 
+            WHERE p.id = ?
+        `, [productId]);
+        
+        if (products.length === 0) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+        
+        res.status(200).json(products[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch product' });
+    }
+});
+
+// POST create product
+app.post('/products', async (req, res) => {
+    try {
+        const { sku, name, description, price, cost, category_id, stock_quantity, reorder_level } = req.body;
+        
+        if (!sku || !name || !price) {
+            return res.status(400).json({ error: 'Missing required fields: sku, name, price' });
+        }
+        
+        if (price <= 0) {
+            return res.status(400).json({ error: 'Price must be greater than 0' });
+        }
+        
+        // Check for duplicate SKU
+        const existingSku = await executeQuery('SELECT id FROM products WHERE sku = ?', [sku]);
+        if (existingSku.length > 0) {
+            return res.status(400).json({ error: 'SKU already exists' });
+        }
+        
+        const result = await executeQuery(`
+            INSERT INTO products (sku, name, description, price, cost, category_id, stock_quantity, reorder_level) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `, [sku, name, description || null, price, cost || null, category_id || null, stock_quantity || 0, reorder_level || 10]);
+        
+        const newProduct = await executeQuery('SELECT * FROM products WHERE id = ?', [result.insertId]);
+        res.status(201).json(newProduct[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create product' });
+    }
+});
+
+// =============================================================================
+// ORDERS ENDPOINTS
+// =============================================================================
+
+// GET all orders
+app.get('/orders', async (req, res) => {
+    try {
+        let query = `
+            SELECT o.*, u.username, u.email 
+            FROM orders o 
+            LEFT JOIN users u ON o.user_id = u.id 
+            WHERE 1=1
+        `;
+        const params = [];
+        
+        // Filter by user
+        if (req.query.user_id) {
+            query += ' AND o.user_id = ?';
+            params.push(Number(req.query.user_id));
+        }
+        
+        // Filter by status
+        if (req.query.status) {
+            query += ' AND o.status = ?';
+            params.push(req.query.status);
+        }
+        
+        query += ' ORDER BY o.created_at DESC';
+        
+        const orders = await executeQuery(query, params);
+        res.status(200).json(orders);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch orders' });
+    }
+});
+
+// GET single order with items
+app.get('/orders/:id', async (req, res) => {
+    try {
+        const orderId = Number(req.params.id);
+        
+        // Get order details
+        const orders = await executeQuery(`
+            SELECT o.*, u.username, u.email 
+            FROM orders o 
+            LEFT JOIN users u ON o.user_id = u.id 
+            WHERE o.id = ?
+        `, [orderId]);
+        
+        if (orders.length === 0) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+        
+        // Get order items
+        const orderItems = await executeQuery(`
+            SELECT oi.*, p.name as product_name, p.sku 
+            FROM order_items oi 
+            LEFT JOIN products p ON oi.product_id = p.id 
+            WHERE oi.order_id = ?
+        `, [orderId]);
+        
+        const order = orders[0];
+        order.items = orderItems;
+        
+        res.status(200).json(order);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch order' });
+    }
+});
+
+// POST create order
+app.post('/orders', async (req, res) => {
+    try {
+        const { user_id, items, shipping_address, billing_address, notes } = req.body;
+        
+        if (!user_id || !items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'Missing required fields: user_id, items (array)' });
+        }
+        
+        // Verify user exists
+        const user = await executeQuery('SELECT id FROM users WHERE id = ?', [user_id]);
+        if (user.length === 0) {
+            return res.status(400).json({ error: 'User not found' });
+        }
+        
+        // Calculate total amount
+        let totalAmount = 0;
+        for (const item of items) {
+            if (!item.product_id || !item.quantity || item.quantity <= 0) {
+                return res.status(400).json({ error: 'Invalid item: must have product_id and positive quantity' });
+            }
+            
+            const product = await executeQuery('SELECT price FROM products WHERE id = ?', [item.product_id]);
+            if (product.length === 0) {
+                return res.status(400).json({ error: `Product ${item.product_id} not found` });
+            }
+            
+            const unitPrice = product[0].price;
+            const itemTotal = unitPrice * item.quantity;
+            totalAmount += itemTotal;
+        }
+        
+        // Generate order number
+        const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        
+        // Create order
+        const orderResult = await executeQuery(`
+            INSERT INTO orders (order_number, user_id, status, total_amount, shipping_address, billing_address, notes) 
+            VALUES (?, ?, 'pending', ?, ?, ?, ?)
+        `, [orderNumber, user_id, totalAmount, shipping_address || null, billing_address || null, notes || null]);
+        
+        const orderId = orderResult.insertId;
+        
+        // Create order items
+        for (const item of items) {
+            const product = await executeQuery('SELECT price FROM products WHERE id = ?', [item.product_id]);
+            const unitPrice = product[0].price;
+            const totalPrice = unitPrice * item.quantity;
+            
+            await executeQuery(`
+                INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price) 
+                VALUES (?, ?, ?, ?, ?)
+            `, [orderId, item.product_id, item.quantity, unitPrice, totalPrice]);
+        }
+        
+        // Return created order with items
+        const newOrder = await executeQuery('SELECT * FROM orders WHERE id = ?', [orderId]);
+        const orderItems = await executeQuery(`
+            SELECT oi.*, p.name as product_name, p.sku 
+            FROM order_items oi 
+            LEFT JOIN products p ON oi.product_id = p.id 
+            WHERE oi.order_id = ?
+        `, [orderId]);
+        
+        newOrder[0].items = orderItems;
+        res.status(201).json(newOrder[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create order' });
+    }
+});
+
+// PATCH update order status
+app.patch('/orders/:id/status', async (req, res) => {
+    try {
+        const orderId = Number(req.params.id);
+        const { status } = req.body;
+        
+        const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+        }
+        
+        const result = await executeQuery('UPDATE orders SET status = ? WHERE id = ?', [status, orderId]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+        
+        const updatedOrder = await executeQuery('SELECT * FROM orders WHERE id = ?', [orderId]);
+        res.status(200).json(updatedOrder[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update order status' });
+    }
+});
+
+// =============================================================================
+// CART ENDPOINTS
+// =============================================================================
+
+// GET user's cart
+app.get('/users/:userId/cart', async (req, res) => {
+    try {
+        const userId = Number(req.params.userId);
+        
+        const cartItems = await executeQuery(`
+            SELECT ci.*, p.name, p.price, p.sku, (ci.quantity * p.price) as total_price
+            FROM cart_items ci 
+            JOIN products p ON ci.product_id = p.id 
+            WHERE ci.user_id = ?
+        `, [userId]);
+        
+        res.status(200).json(cartItems);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch cart' });
+    }
+});
+
+// POST add item to cart
+app.post('/users/:userId/cart', async (req, res) => {
+    try {
+        const userId = Number(req.params.userId);
+        const { product_id, quantity } = req.body;
+        
+        if (!product_id || !quantity || quantity <= 0) {
+            return res.status(400).json({ error: 'Missing or invalid fields: product_id, quantity' });
+        }
+        
+        // Check if item already exists in cart
+        const existing = await executeQuery('SELECT * FROM cart_items WHERE user_id = ? AND product_id = ?', [userId, product_id]);
+        
+        if (existing.length > 0) {
+            // Update quantity
+            await executeQuery('UPDATE cart_items SET quantity = quantity + ? WHERE user_id = ? AND product_id = ?', [quantity, userId, product_id]);
+        } else {
+            // Add new item
+            await executeQuery('INSERT INTO cart_items (user_id, product_id, quantity) VALUES (?, ?, ?)', [userId, product_id, quantity]);
+        }
+        
+        const cartItems = await executeQuery(`
+            SELECT ci.*, p.name, p.price, p.sku, (ci.quantity * p.price) as total_price
+            FROM cart_items ci 
+            JOIN products p ON ci.product_id = p.id 
+            WHERE ci.user_id = ?
+        `, [userId]);
+        
+        res.status(200).json(cartItems);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add item to cart' });
+    }
+});
+
+// =============================================================================
+// REVIEWS ENDPOINTS
+// =============================================================================
+
+// GET product reviews
+app.get('/products/:productId/reviews', async (req, res) => {
+    try {
+        const productId = Number(req.params.productId);
+        
+        const reviews = await executeQuery(`
+            SELECT r.*, u.username 
+            FROM reviews r 
+            LEFT JOIN users u ON r.user_id = u.id 
+            WHERE r.product_id = ? 
+            ORDER BY r.created_at DESC
+        `, [productId]);
+        
+        res.status(200).json(reviews);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch reviews' });
+    }
+});
+
+// POST create review
+app.post('/products/:productId/reviews', async (req, res) => {
+    try {
+        const productId = Number(req.params.productId);
+        const { user_id, rating, title, comment } = req.body;
+        
+        if (!user_id || !rating || rating < 1 || rating > 5) {
+            return res.status(400).json({ error: 'Missing or invalid fields: user_id, rating (1-5)' });
+        }
+        
+        const result = await executeQuery(`
+            INSERT INTO reviews (product_id, user_id, rating, title, comment) 
+            VALUES (?, ?, ?, ?, ?)
+        `, [productId, user_id, rating, title || null, comment || null]);
+        
+        const newReview = await executeQuery(`
+            SELECT r.*, u.username 
+            FROM reviews r 
+            LEFT JOIN users u ON r.user_id = u.id 
+            WHERE r.id = ?
+        `, [result.insertId]);
+        
+        res.status(201).json(newReview[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create review' });
+    }
+});
+
+// =============================================================================
+// UTILITY ENDPOINTS
+// =============================================================================
 
 // GET secure data (requires authentication)
 app.get('/secure-data', authenticate, (req, res) => {
-    // This route is protected by the 'authenticate' middleware
     res.status(200).json({ message: 'This is secure data, access granted.', user: req.user });
 });
 
@@ -306,7 +593,7 @@ app.get('/secure-data', authenticate, (req, res) => {
 app.get('/slow-response', (req, res) => {
     setTimeout(() => {
         res.status(200).json({ message: 'This took 2 seconds!' });
-    }, 2000); // 2 second delay
+    }, 2000);
 });
 
 // GET text response (returns plain text)
@@ -317,8 +604,99 @@ app.get('/text-response', (req, res) => {
 
 // GET internal error (always returns 500)
 app.get('/internal-error', (req, res) => {
-    console.error('[Simulated Error] An unexpected issue occurred.'); // Log the simulated error
+    console.error('[Simulated Error] An unexpected issue occurred.');
     res.status(500).json({ error: 'Internal Server Error (Simulated)' });
+});
+
+// =============================================================================
+// GEMINI CREATIVE ENDPOINTS
+// =============================================================================
+
+// GET potential escape risks
+app.get('/api/creative/escape-risks', async (req, res) => {
+    try {
+        const query = `
+            WITH AtRiskHabitats AS (
+                SELECT habitat_id
+                FROM habitats
+                WHERE habitat_type = 'Outdoor' OR (temp_range_high - temp_range_low) > 20
+            )
+            SELECT
+                a.name AS AnimalName,
+                a.species,
+                a.weight_kg,
+                h.habitat_name AS HabitatName,
+                h.habitat_type
+            FROM
+                animals a
+            JOIN
+                habitats h ON a.habitat_id = h.habitat_id
+            WHERE
+                a.weight_kg < 10
+                AND a.habitat_id IN (SELECT habitat_id FROM AtRiskHabitats);
+        `;
+        const results = await executeQuery(query);
+        res.status(200).json(results);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch escape risks' });
+    }
+});
+
+// GET potential animal friends
+app.get('/api/creative/friendship-candidates', async (req, res) => {
+    try {
+        const query = `
+            SELECT
+                a1.name AS Animal1,
+                a1.species,
+                h1.habitat_name AS Habitat1,
+                a2.name AS Animal2,
+                h2.habitat_name AS Habitat2
+            FROM
+                animals a1
+            JOIN
+                animals a2 ON a1.species = a2.species AND a1.animal_id < a2.animal_id
+            JOIN
+                habitats h1 ON a1.habitat_id = h1.habitat_id
+            JOIN
+                habitats h2 ON a2.habitat_id = h2.habitat_id
+            WHERE
+                a1.habitat_id != a2.habitat_id;
+        `;
+        const results = await executeQuery(query);
+        res.status(200).json(results);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch friendship candidates' });
+    }
+});
+
+// GET the "A-Team"
+app.get('/api/creative/a-team', async (req, res) => {
+    try {
+        const query = `
+            SELECT
+                vet.first_name AS Veterinarian,
+                trainer.first_name AS Trainer,
+                caretaker.first_name AS Caretaker
+            FROM
+                staff vet
+            CROSS JOIN
+                staff trainer
+            CROSS JOIN
+                staff caretaker
+            WHERE
+                vet.role = 'Veterinarian'
+                AND trainer.role = 'Trainer'
+                AND caretaker.role = 'Caretaker'
+                AND vet.staff_id != trainer.staff_id
+                AND vet.staff_id != caretaker.staff_id
+                AND trainer.staff_id != caretaker.staff_id;
+        `;
+        const results = await executeQuery(query);
+        res.status(200).json(results);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to assemble the A-Team' });
+    }
 });
 
 // Catch-all for undefined routes
@@ -327,16 +705,18 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`API server running on http://localhost:${PORT}`);
-    console.log('--- Resources ---');
-    console.log('  /posts (CRUD, Filter, Sort, PATCH publish)');
-    console.log('  /users (CRUD)');
-    console.log('  /comments (CRUD)');
-    console.log('  /posts/:postId/comments (Read, Create)');
+    console.log(`E-commerce API server running on http://localhost:${PORT}`);
+    console.log('--- E-commerce Resources ---');
+    console.log('  /users (CRUD - User management)');
+    console.log('  /categories (CRUD - Product categories)');
+    console.log('  /products (CRUD, Filter, Search - Product catalog)');
+    console.log('  /orders (CRUD, Filter - Order management)');
+    console.log('  /users/:userId/cart (Cart management)');
+    console.log('  /products/:productId/reviews (Product reviews)');
     console.log('--- Utility ---');
     console.log('  /secure-data (GET, Auth Required)');
     console.log('  /slow-response (GET, 2s Delay)');
     console.log('  /text-response (GET, Plain Text)');
     console.log('  /internal-error (GET, Always 500)');
-    console.log('--- Initial Data Contains Issues for Testing! ---');
-}); 
+    console.log('--- Database Aligned with MySQL sql_training schema ---');
+});

@@ -1,54 +1,67 @@
-/*
+import { test as base } from '@playwright/test';
+import { LoginPage, ProductsPage, CartPage, CheckoutPage } from '../pages/index.js';
+import TestDataManager from '../data/TestDataManager.js';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
-What are fixtures?
-Fixtures are a way to SET UP (TEARDOWN) and provide REUSABLE OBJECTS to your tests. 
-Think of them as a "preparation" step that happens before your tests run.
+// Get the directory name
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-//Starting the file here*
-*/
-
-//Fixtures are a Playwright concept that help make tests cleaner
-//They provide reusable objects and setup/teardown for tests
-
-//Import base test objects from Playwright
-// 'base' is the standard Playwright test runner
-import { test as base } from '@playwright/test'
-
-import { SimpleHomePage, SimpleProductPage, SimpleCartPage } from '../pages/index.js'
-
-//**
-// Simple Fixtures for our basic demo
-// Fixtures automate the creation of the page objects we need
-//
-//  */
-
-
-// extend adds our custom fixtures to the base test object
+/**
+ * Define the base fixtures
+ */
 export const test = base.extend({
-
-    //Simple Home Page Fixture
-    homePage: async ({ page }, use) => {
-        const homePage = new SimpleHomePage(page);
-        await use(homePage);
-
+    /**
+     * Login page fixture
+     */
+    loginPage: async ({ page }, use) => {
+        const loginPage = new LoginPage(page);
+        await use(loginPage);
     },
 
-    //Simple Product Page Fixture
-    productPage: async ({ page }, use) => {
-        const productPage = new SimpleProductPage(page);
-        await use(productPage);
+    /**
+     * Products page fixture
+     */
+    productsPage: async ({ page }, use) => {
+        const productsPage = new ProductsPage(page);
+        await use(productsPage);
     },
 
-    //Simple Cart Page Fixture  
+    /**
+     * Cart page fixture
+     */
     cartPage: async ({ page }, use) => {
-
-        const cartPage = new SimpleCartPage(page);
+        const cartPage = new CartPage(page);
         await use(cartPage);
+    },
+
+    /**
+     * Checkout page fixture
+     */
+    checkoutPage: async ({ page }, use) => {
+        const checkoutPage = new CheckoutPage(page);
+        await use(checkoutPage);
+    },
+
+    /**
+     * Test data manager fixture
+     */
+    testData: async ({ }, use) => {
+        const dataFilePath = path.resolve(process.cwd(), 'src/data/testData.json');
+        const testDataManager = new TestDataManager(dataFilePath);
+        await use(testDataManager);
+    },
+
+    /**
+     * Authenticated page fixture - automatically logs in with standard user
+     */
+    authenticatedPage: async ({ page }, use) => {
+        const loginPage = new LoginPage(page);
+        await loginPage.goto();
+        await loginPage.login('standard_user', 'secret_sauce');
+        await use(page);
     }
+});
 
-})
-
-//Export the fixtures so they can be used in tests
-export { expect } from '@playwright/test'
-
-
+export { expect } from '@playwright/test'; 
