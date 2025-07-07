@@ -1,0 +1,1 @@
+web: cd animal-sanctuary-frontend && npm run build && npm start
