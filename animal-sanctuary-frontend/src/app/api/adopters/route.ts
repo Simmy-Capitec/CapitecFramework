@@ -1,168 +1,99 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+import { db, adopters, logActivity } from '@/lib/db';
+import { and, eq, sql, count, desc, asc, like } from 'drizzle-orm';
 
-// Database connection configuration
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306'),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'password123',
-  database: process.env.DB_NAME || 'animal_sanctuary_capstone',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-};
-
-const pool = mysql.createPool(dbConfig);
-
-// GET /api/adopters - Get all adopters
 export async function GET(request: NextRequest) {
   try {
-    console.log('🐾 API: GET /api/adopters');
-    
-    const [rows] = await pool.execute(`
-      SELECT 
-        adopter_id,
-        first_name,
-        last_name,
-        email,
-        phone,
-        address,
-        city,
-        state,
-        zip_code,
-        housing_type,
-        yard_fenced,
-        other_pets,
-        experience_level,
-        references,
-        emergency_contact,
-        employment_status,
-        annual_income,
-        created_at,
-        updated_at
-      FROM adopters 
-      ORDER BY created_at DESC
-    `);
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+
+    const whereConditions = [eq(adopters.isActive, true)];
+
+    if (search) {
+      whereConditions.push(
+        sql`(${adopters.firstName} ILIKE ${`%${search}%`} OR ${adopters.lastName} ILIKE ${`%${search}%`} OR ${adopters.email} ILIKE ${`%${search}%`})`
+      );
+    }
+
+    const offset = (page - 1) * limit;
+
+    const adoptersResult = await db
+      .select()
+      .from(adopters)
+      .where(and(...whereConditions))
+      .orderBy(asc(adopters.firstName))
+      .limit(limit)
+      .offset(offset);
+
+    const [{ count: total }] = await db
+      .select({ count: count() })
+      .from(adopters)
+      .where(and(...whereConditions));
 
     return NextResponse.json({
       success: true,
-      data: rows,
-      message: `Retrieved ${(rows as any[]).length} adopters`
+      data: adoptersResult,
+      pagination: {
+        current_page: page,
+        per_page: limit,
+        total_records: total,
+        total_pages: Math.ceil(total / limit)
+      }
     });
-
   } catch (error) {
-    console.error('❌ Database error:', error);
+    console.error('Error fetching adopters:', error);
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to fetch adopters',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { success: false, error: 'Failed to fetch adopters' },
       { status: 500 }
     );
   }
 }
 
-// POST /api/adopters - Create new adopter
 export async function POST(request: NextRequest) {
   try {
-    console.log('🐾 API: POST /api/adopters');
-    
     const body = await request.json();
-    
-    // Validate required fields
-    const requiredFields = ['first_name', 'last_name', 'email', 'phone'];
-    const missingFields = requiredFields.filter(field => !body[field]);
-    
-    if (missingFields.length > 0) {
+    const { first_name, last_name, email, phone } = body;
+
+    if (!first_name || !last_name || !email || !phone) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Missing required fields',
-          missing_fields: missingFields
-        },
+        { success: false, error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    // Insert new adopter
-    const [result] = await pool.execute(
-      `INSERT INTO adopters (
-        first_name,
-        last_name,
+    const [createdAdopter] = await db
+      .insert(adopters)
+      .values({
+        firstName: first_name,
+        lastName: last_name,
         email,
-        phone,
-        address,
-        city,
-        state,
-        zip_code,
-        housing_type,
-        yard_fenced,
-        other_pets,
-        experience_level,
-        references,
-        emergency_contact,
-        employment_status,
-        annual_income
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        body.first_name,
-        body.last_name,
-        body.email,
-        body.phone,
-        body.address || null,
-        body.city || null,
-        body.state || null,
-        body.zip_code || null,
-        body.housing_type || null,
-        body.yard_fenced || false,
-        body.other_pets || null,
-        body.experience_level || null,
-        body.references || null,
-        body.emergency_contact || null,
-        body.employment_status || null,
-        body.annual_income || null
-      ]
-    );
+        phoneNumber: phone,
+        address: body.address,
+        city: body.city,
+        state: body.state,
+        zipCode: body.zip_code,
+        housingType: body.housing_type,
+        hasYard: body.yard_fenced,
+        currentPets: body.other_pets,
+        experienceDetails: body.experience_level,
+        references: body.references
+      })
+      .returning();
 
-    const adopterId = (result as any).insertId;
-
-    // Fetch the created adopter
-    const [rows] = await pool.execute(
-      'SELECT * FROM adopters WHERE adopter_id = ?',
-      [adopterId]
-    );
-
-    const newAdopter = (rows as any[])[0];
+    const clientIp = request.headers.get('x-forwarded-for') || 'unknown';
+    await logActivity('adopters', createdAdopter.adopterId, 'INSERT', 'Staff', null, null, body, clientIp);
 
     return NextResponse.json({
       success: true,
-      data: newAdopter,
-      message: `Adopter created successfully with ID ${adopterId}`
-    });
-
+      data: createdAdopter,
+      message: 'Adopter created successfully'
+    }, { status: 201 });
   } catch (error) {
-    console.error('❌ Database error:', error);
-    
-    // Handle duplicate email error
-    if (error instanceof Error && error.message.includes('Duplicate entry')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Email address already exists',
-          details: 'An adopter with this email address is already registered'
-        },
-        { status: 409 }
-      );
-    }
-
+    console.error('Error creating adopter:', error);
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to create adopter',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { success: false, error: 'Failed to create adopter' },
       { status: 500 }
     );
   }

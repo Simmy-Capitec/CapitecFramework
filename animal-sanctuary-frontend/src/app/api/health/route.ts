@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { testConnection, getDatabaseStats } from '@/lib/database';
+import { testConnection, getDatabaseStats } from '@/lib/db';
 
 // ===================================================================
 // HEALTH CHECK API ENDPOINT

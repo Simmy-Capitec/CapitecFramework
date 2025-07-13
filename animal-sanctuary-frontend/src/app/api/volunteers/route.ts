@@ -1,192 +1,112 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
-import { withPermission, publicRoute, getCurrentUser, type AuthenticatedRequest } from '@/middleware/auth';
+import { db, volunteers, logActivity } from '@/lib/db';
+import { and, eq, sql, count, desc, asc } from 'drizzle-orm';
 
-// Database connection configuration
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306'),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'password123',
-  database: process.env.DB_NAME || 'animal_sanctuary_capstone',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-};
-
-const pool = mysql.createPool(dbConfig);
-
-// GET /api/volunteers - Get all volunteers (Protected route)
-export const GET = withPermission('volunteers')(async (request: AuthenticatedRequest) => {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
-    
-    let query = `
-      SELECT 
-        volunteer_id,
-        first_name,
-        last_name,
-        email,
-        phone,
-        city,
-        state,
-        status,
-        start_date,
-        total_hours_logged,
-        background_check_completed,
-        orientation_completed,
-        created_at
-      FROM volunteers
-    `;
-    
-    const queryParams: any[] = [];
-    
-    if (status && status !== 'all') {
-      query += ' WHERE status = ?';
-      queryParams.push(status);
+    const search = searchParams.get('search');
+    const isActive = searchParams.get('active') !== 'false';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+
+    const whereConditions = [eq(volunteers.isActive, isActive)];
+
+    if (search) {
+      whereConditions.push(
+        sql`(${volunteers.firstName} ILIKE ${`%${search}%`} OR ${volunteers.lastName} ILIKE ${`%${search}%`} OR ${volunteers.email} ILIKE ${`%${search}%`})`
+      );
     }
-    
-    query += ' ORDER BY created_at DESC';
-    
-    const [rows] = await pool.execute(query, queryParams);
-    
+
+    const offset = (page - 1) * limit;
+
+    const volunteersResult = await db
+      .select()
+      .from(volunteers)
+      .where(and(...whereConditions))
+      .orderBy(asc(volunteers.firstName))
+      .limit(limit)
+      .offset(offset);
+
+    const [{ count: total }] = await db
+      .select({ count: count() })
+      .from(volunteers)
+      .where(and(...whereConditions));
+
     return NextResponse.json({
       success: true,
-      data: rows,
-      count: (rows as any[]).length
+      data: volunteersResult,
+      pagination: {
+        current_page: page,
+        per_page: limit,
+        total_records: total,
+        total_pages: Math.ceil(total / limit)
+      }
     });
-    
   } catch (error) {
-    console.error('❌ Database error:', error);
+    console.error('Error fetching volunteers:', error);
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to fetch volunteers',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { success: false, error: 'Failed to fetch volunteers' },
       { status: 500 }
     );
   }
-});
+}
 
-// POST /api/volunteers - Create new volunteer application (Public route)
-export const POST = publicRoute(async (request: NextRequest) => {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('🐾 API: POST /api/volunteers', body);
-    
-    // Validate required fields
-    const requiredFields = ['firstName', 'lastName', 'email', 'phone'];
-    for (const field of requiredFields) {
-      if (!body[field]) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Missing required field: ${field}`,
-            details: 'All required fields must be provided'
-          },
-          { status: 400 }
-        );
-      }
-    }
-    
-    // Check if email already exists
-    const [existingRows] = await pool.execute(
-      'SELECT volunteer_id FROM volunteers WHERE email = ?',
-      [body.email]
-    );
-    
-    if ((existingRows as any[]).length > 0) {
+    const { first_name, last_name, email, phone_number } = body;
+
+    if (!first_name || !last_name || !email) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Email already registered',
-          details: 'A volunteer with this email already exists'
-        },
+        { success: false, error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    const [createdVolunteer] = await db
+      .insert(volunteers)
+      .values({
+        firstName: first_name,
+        lastName: last_name,
+        email,
+        phoneNumber: phone_number,
+        address: body.address,
+        city: body.city,
+        state: body.state,
+        zipCode: body.zip_code,
+        dateOfBirth: body.date_of_birth,
+        emergencyContact: body.emergency_contact,
+        emergencyPhone: body.emergency_phone,
+        availability: body.availability,
+        skills: body.skills,
+        interests: body.interests,
+        backgroundCheck: body.background_check || false,
+        orientation: body.orientation || false
+      })
+      .returning();
+
+    const clientIp = request.headers.get('x-forwarded-for') || 'unknown';
+    await logActivity('volunteers', createdVolunteer.volunteerId, 'INSERT', 'Public', null, null, body, clientIp);
+
+    return NextResponse.json({
+      success: true,
+      data: createdVolunteer,
+      message: 'Volunteer application submitted successfully'
+    }, { status: 201 });
+  } catch (error) {
+    console.error('Error creating volunteer:', error);
+    
+    if (error instanceof Error && 'code' in error && error.code === '23505') {
+      return NextResponse.json(
+        { success: false, error: 'Email address already exists' },
         { status: 409 }
       );
     }
-    
-    // Prepare data for insertion
-    const volunteerData = {
-      first_name: body.firstName,
-      last_name: body.lastName,
-      email: body.email,
-      phone: body.phone,
-      date_of_birth: body.dateOfBirth || null,
-      emergency_contact: JSON.stringify({
-        contact_info: body.emergencyContact || '',
-        relationship: 'Emergency Contact'
-      }),
-      availability: JSON.stringify(body.availability || []),
-      skills: JSON.stringify({
-        interests: body.interests || [],
-        experience: body.experience || 'none',
-        occupation: body.occupation || null,
-        whyVolunteer: body.whyVolunteer || ''
-      }),
-      start_date: new Date().toISOString().split('T')[0],
-      status: 'Active',
-      background_check_completed: false,
-      orientation_completed: false,
-      total_hours_logged: 0
-    };
-    
-    // Insert new volunteer
-    const [result] = await pool.execute(
-      `INSERT INTO volunteers (
-        first_name, last_name, email, phone, date_of_birth,
-        emergency_contact, availability, skills, start_date, status,
-        background_check_completed, orientation_completed, total_hours_logged
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        volunteerData.first_name,
-        volunteerData.last_name,
-        volunteerData.email,
-        volunteerData.phone,
-        volunteerData.date_of_birth,
-        volunteerData.emergency_contact,
-        volunteerData.availability,
-        volunteerData.skills,
-        volunteerData.start_date,
-        volunteerData.status,
-        volunteerData.background_check_completed,
-        volunteerData.orientation_completed,
-        volunteerData.total_hours_logged
-      ]
-    );
-    
-    const insertId = (result as any).insertId;
-    
-    // Fetch the created volunteer
-    const [newVolunteerRows] = await pool.execute(
-      'SELECT * FROM volunteers WHERE volunteer_id = ?',
-      [insertId]
-    );
-    
-    const newVolunteer = (newVolunteerRows as any[])[0];
-    
-    return NextResponse.json({
-      success: true,
-      data: {
-        volunteer_id: newVolunteer.volunteer_id,
-        name: `${newVolunteer.first_name} ${newVolunteer.last_name}`,
-        email: newVolunteer.email,
-        status: newVolunteer.status
-      },
-      message: `Volunteer application for ${newVolunteer.first_name} ${newVolunteer.last_name} submitted successfully!`
-    }, { status: 201 });
-    
-  } catch (error) {
-    console.error('❌ Database error:', error);
+
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to create volunteer application',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { success: false, error: 'Failed to create volunteer' },
       { status: 500 }
     );
   }
-});
+}
