@@ -70,18 +70,16 @@ export const animals = animalSanctuary.table('animals', {
 
 export const staff = animalSanctuary.table('staff', {
   staffId: serial('staff_id').primaryKey(),
-  employeeId: varchar('employee_id', { length: 20 }).notNull(),
   firstName: varchar('first_name', { length: 50 }).notNull(),
   lastName: varchar('last_name', { length: 50 }).notNull(),
   email: varchar('email', { length: 100 }).notNull(),
-  phone: varchar('phone', { length: 20 }),
-  role: varchar('role', { length: 30 }).notNull(),
-  specialization: varchar('specialization', { length: 100 }),
+  phoneNumber: varchar('phone_number', { length: 20 }),
+  position: varchar('position', { length: 50 }),
+  department: varchar('department', { length: 50 }),
   hireDate: date('hire_date').notNull(),
-  salary: decimal('salary', { precision: 10, scale: 2 }),
+  passwordHash: varchar('password_hash', { length: 255 }),
+  role: varchar('role', { length: 30 }).notNull(),
   isActive: boolean('is_active').default(true),
-  emergencyContact: jsonb('emergency_contact'),
-  certifications: jsonb('certifications'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 });
