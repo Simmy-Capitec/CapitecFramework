@@ -161,7 +161,7 @@ export default function AnimalsPage() {
                 transition={{ duration: 0.6, delay: 0.6 }}
               >
                 {animals.map((animal, index) => (
-                  <AnimalCard key={animal.animal_id} animal={animal} index={index} />
+                  <AnimalCard key={animal.animalId} animal={animal} index={index} />
                 ))}
               </motion.div>
             )}
@@ -243,8 +243,8 @@ function AnimalCard({ animal, index }: AnimalCardProps) {
           <h3 className="text-xl font-semibold text-sanctuary-primary-800">
             {animal.name}
           </h3>
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[animal.adoption_status] || 'bg-gray-100 text-gray-800'}`}>
-            {animal.adoption_status}
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[animal.adoptionStatus] || 'bg-gray-100 text-gray-800'}`}>
+            {animal.adoptionStatus}
           </span>
         </div>
 
@@ -259,17 +259,17 @@ function AnimalCard({ animal, index }: AnimalCardProps) {
             <span>{animal.age} years old</span>
           </div>
           
-          {animal.habitat_name && (
+          {animal.habitatName && (
             <div className="flex items-center">
               <MapPin className="h-4 w-4 mr-1" />
-              <span>{animal.habitat_name}</span>
+              <span>{animal.habitatName}</span>
             </div>
           )}
           
-          {animal.adoption_fee > 0 && (
+          {animal.adoptionFee > 0 && (
             <div className="flex items-center">
               <DollarSign className="h-4 w-4 mr-1" />
-              <span>${animal.adoption_fee} adoption fee</span>
+              <span>${animal.adoptionFee} adoption fee</span>
             </div>
           )}
         </div>
@@ -277,7 +277,7 @@ function AnimalCard({ animal, index }: AnimalCardProps) {
         {/* Action Button */}
         <div className="mt-4">
           <Link 
-            href={`/animals/${animal.animal_id}`}
+            href={`/animals/${animal.animalId}`}
             className="block w-full bg-sanctuary-primary-600 text-white py-2 px-4 rounded-lg hover:bg-sanctuary-primary-700 transition-colors duration-200 text-center"
           >
             Learn More
