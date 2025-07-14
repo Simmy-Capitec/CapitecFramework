@@ -344,8 +344,8 @@ export const volunteerAssignmentsRelations = relations(volunteerAssignments, ({ 
     fields: [volunteerAssignments.animalId],
     references: [animals.animalId],
   }),
-  supervisor: one(staff, {
-    fields: [volunteerAssignments.supervisorId],
+  assignedByStaff: one(staff, {
+    fields: [volunteerAssignments.assignedByStaffId],
     references: [staff.staffId],
   }),
 }));

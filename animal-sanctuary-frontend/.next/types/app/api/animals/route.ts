@@ -1,4 +1,4 @@
-// File: /home/chris/Documents/CapitecFramework/animal-sanctuary-frontend/src/app/api/animals/route.ts
+// File: C:\Users\darks\OneDrive\Documents\Projects\Animal-Sanctuary\CapitecFramework\animal-sanctuary-frontend\src\app\api\animals\route.ts
 import * as entry from '../../../../../src/app/api/animals/route.js'
 import type { NextRequest } from 'next/server.js'
 
