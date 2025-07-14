@@ -70,16 +70,18 @@ export const animals = animalSanctuary.table('animals', {
 
 export const staff = animalSanctuary.table('staff', {
   staffId: serial('staff_id').primaryKey(),
+  employeeId: varchar('employee_id', { length: 20 }).notNull(),
   firstName: varchar('first_name', { length: 50 }).notNull(),
   lastName: varchar('last_name', { length: 50 }).notNull(),
   email: varchar('email', { length: 100 }).notNull(),
-  phoneNumber: varchar('phone_number', { length: 20 }),
-  position: varchar('position', { length: 100 }),
-  department: varchar('department', { length: 100 }),
-  hireDate: date('hire_date'),
-  passwordHash: varchar('password_hash', { length: 255 }),
-  role: varchar('role', { length: 50 }).default('staff'),
+  phone: varchar('phone', { length: 20 }),
+  role: varchar('role', { length: 30 }).notNull(),
+  specialization: varchar('specialization', { length: 100 }),
+  hireDate: date('hire_date').notNull(),
+  salary: decimal('salary', { precision: 10, scale: 2 }),
   isActive: boolean('is_active').default(true),
+  emergencyContact: jsonb('emergency_contact'),
+  certifications: jsonb('certifications'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 });
@@ -104,17 +106,20 @@ export const adopters = animalSanctuary.table('adopters', {
   firstName: varchar('first_name', { length: 50 }).notNull(),
   lastName: varchar('last_name', { length: 50 }).notNull(),
   email: varchar('email', { length: 100 }).notNull(),
-  phoneNumber: varchar('phone_number', { length: 20 }),
+  phone: varchar('phone', { length: 20 }),
   address: text('address'),
   city: varchar('city', { length: 100 }),
   state: varchar('state', { length: 50 }),
   zipCode: varchar('zip_code', { length: 10 }),
-  hasExperience: boolean('has_experience').default(false),
-  experienceDetails: text('experience_details'),
-  currentPets: text('current_pets'),
+  dateOfBirth: date('date_of_birth'),
+  occupation: varchar('occupation', { length: 100 }),
   housingType: varchar('housing_type', { length: 50 }),
+  housingOwned: boolean('housing_owned'),
   hasYard: boolean('has_yard').default(false),
-  references: text('references'),
+  yardFenced: boolean('yard_fenced'),
+  hasOtherPets: boolean('has_other_pets'),
+  otherPetsDetails: text('other_pets_details'),
+  previousPetExperience: text('previous_pet_experience'),
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
@@ -125,19 +130,21 @@ export const adoptionApplications = animalSanctuary.table('adoption_applications
   adopterId: integer('adopter_id').references(() => adopters.adopterId).notNull(),
   animalId: integer('animal_id').references(() => animals.animalId).notNull(),
   applicationDate: date('application_date').notNull(),
-  status: applicationStatusEnum('status').default('Submitted'),
+  status: varchar('status', { length: 20 }).default('Submitted'),
+  preferredAdoptionDate: date('preferred_adoption_date'),
   reasonForAdoption: text('reason_for_adoption'),
-  livingArrangement: text('living_arrangement'),
+  lifestyleInfo: text('lifestyle_info'),
   workSchedule: text('work_schedule'),
-  previousPetExperience: text('previous_pet_experience'),
-  veterinarianInfo: text('veterinarian_info'),
-  references: text('references'),
-  homeVisitScheduled: date('home_visit_scheduled'),
-  homeVisitCompleted: date('home_visit_completed'),
+  travelFrequency: text('travel_frequency'),
+  planForPetCare: text('plan_for_pet_care'),
+  monthlyBudget: decimal('monthly_budget', { precision: 8, scale: 2 }),
+  specialRequests: text('special_requests'),
   interviewDate: date('interview_date'),
-  approvalDate: date('approval_date'),
-  rejectionReason: text('rejection_reason'),
-  staffNotes: text('staff_notes'),
+  interviewerStaffId: integer('interviewer_staff_id').references(() => staff.staffId),
+  interviewNotes: text('interview_notes'),
+  decisionDate: date('decision_date'),
+  decisionReason: text('decision_reason'),
+  approvedByStaffId: integer('approved_by_staff_id').references(() => staff.staffId),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 });
@@ -145,12 +152,19 @@ export const adoptionApplications = animalSanctuary.table('adoption_applications
 export const adoptions = animalSanctuary.table('adoptions', {
   adoptionId: serial('adoption_id').primaryKey(),
   applicationId: integer('application_id').references(() => adoptionApplications.applicationId).notNull(),
+  adopterId: integer('adopter_id').references(() => adopters.adopterId).notNull(),
+  animalId: integer('animal_id').references(() => animals.animalId).notNull(),
   adoptionDate: date('adoption_date').notNull(),
-  adoptionFee: decimal('adoption_fee', { precision: 8, scale: 2 }).notNull(),
+  adoptionFeePaid: decimal('adoption_fee_paid', { precision: 8, scale: 2 }),
   contractSigned: boolean('contract_signed').default(false),
+  microchipTransferred: boolean('microchip_transferred').default(false),
+  followUpRequired: boolean('follow_up_required').default(true),
   followUpDate: date('follow_up_date'),
   followUpCompleted: boolean('follow_up_completed').default(false),
-  notes: text('notes'),
+  followUpNotes: text('follow_up_notes'),
+  returnPolicyExplained: boolean('return_policy_explained').default(false),
+  adoptionCounselorId: integer('adoption_counselor_id').references(() => staff.staffId),
+  specialConditions: text('special_conditions'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 });
@@ -160,7 +174,7 @@ export const donors = animalSanctuary.table('donors', {
   firstName: varchar('first_name', { length: 50 }).notNull(),
   lastName: varchar('last_name', { length: 50 }).notNull(),
   email: varchar('email', { length: 100 }).notNull(),
-  phoneNumber: varchar('phone_number', { length: 20 }),
+  phone: varchar('phone', { length: 20 }),
   address: text('address'),
   city: varchar('city', { length: 100 }),
   state: varchar('state', { length: 50 }),
@@ -193,7 +207,7 @@ export const volunteers = animalSanctuary.table('volunteers', {
   firstName: varchar('first_name', { length: 50 }).notNull(),
   lastName: varchar('last_name', { length: 50 }).notNull(),
   email: varchar('email', { length: 100 }).notNull(),
-  phoneNumber: varchar('phone_number', { length: 20 }),
+  phone: varchar('phone', { length: 20 }),
   address: text('address'),
   city: varchar('city', { length: 100 }),
   state: varchar('state', { length: 50 }),
@@ -217,13 +231,16 @@ export const volunteerAssignments = animalSanctuary.table('volunteer_assignments
   assignmentId: serial('assignment_id').primaryKey(),
   volunteerId: integer('volunteer_id').references(() => volunteers.volunteerId).notNull(),
   animalId: integer('animal_id').references(() => animals.animalId),
-  assignmentDate: date('assignment_date').notNull(),
-  task: varchar('task', { length: 200 }),
-  startTime: timestamp('start_time'),
-  endTime: timestamp('end_time'),
-  hoursWorked: decimal('hours_worked', { precision: 4, scale: 2 }),
+  taskType: varchar('task_type', { length: 20 }).notNull(),
+  taskDescription: text('task_description'),
+  assignedDate: date('assigned_date').notNull(),
+  scheduledDate: timestamp('scheduled_date'),
+  estimatedHours: decimal('estimated_hours', { precision: 4, scale: 2 }),
+  actualHours: decimal('actual_hours', { precision: 4, scale: 2 }),
+  status: varchar('status', { length: 15 }).default('Assigned'),
+  completionDate: timestamp('completion_date'),
+  assignedByStaffId: integer('assigned_by_staff_id').references(() => staff.staffId),
   notes: text('notes'),
-  supervisorId: integer('supervisor_id').references(() => staff.staffId),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 });
@@ -252,47 +269,8 @@ export const activityLog = animalSanctuary.table('activity_log', {
   timestamp: timestamp('timestamp').defaultNow()
 });
 
-// ===================================================================
-// VIEWS (as tables for easier querying)
-// ===================================================================
-
-export const availableAnimals = animalSanctuary.table('available_animals', {
-  animalId: integer('animal_id').primaryKey(),
-  name: varchar('name', { length: 100 }),
-  species: varchar('species', { length: 50 }),
-  breed: varchar('breed', { length: 100 }),
-  age: integer('age'),
-  gender: varchar('gender', { length: 10 }),
-  adoptionFee: decimal('adoption_fee', { precision: 8, scale: 2 }),
-  habitatName: varchar('habitat_name', { length: 100 }),
-  photos: jsonb('photos'),
-  specialNeeds: text('special_needs')
-});
-
-export const adoptionStats = animalSanctuary.table('adoption_stats', {
-  year: integer('year'),
-  month: integer('month'),
-  totalAdoptions: integer('total_adoptions'),
-  totalRevenue: decimal('total_revenue', { precision: 10, scale: 2 }),
-  averageAdoptionTime: integer('average_adoption_time')
-});
-
-export const volunteerActivity = animalSanctuary.table('volunteer_activity', {
-  volunteerId: integer('volunteer_id'),
-  volunteerName: varchar('volunteer_name', { length: 100 }),
-  totalHours: decimal('total_hours', { precision: 6, scale: 2 }),
-  lastActivity: date('last_activity'),
-  tasksCompleted: integer('tasks_completed')
-});
-
-export const donorSummary = animalSanctuary.table('donor_summary', {
-  donorId: integer('donor_id'),
-  donorName: varchar('donor_name', { length: 100 }),
-  totalDonations: decimal('total_donations', { precision: 10, scale: 2 }),
-  donationCount: integer('donation_count'),
-  lastDonation: date('last_donation'),
-  averageDonation: decimal('average_donation', { precision: 10, scale: 2 })
-});
+// Note: Views removed - these don't exist in the actual database
+// If needed, these can be implemented as database views later
 
 // ===================================================================
 // RELATIONS
