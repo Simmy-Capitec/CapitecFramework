@@ -77,6 +77,8 @@ export const staff = animalSanctuary.table('staff', {
   position: varchar('position', { length: 100 }),
   department: varchar('department', { length: 100 }),
   hireDate: date('hire_date'),
+  passwordHash: varchar('password_hash', { length: 255 }),
+  role: varchar('role', { length: 50 }).default('staff'),
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()

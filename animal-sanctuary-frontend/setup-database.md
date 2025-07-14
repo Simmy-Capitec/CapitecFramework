@@ -2,56 +2,56 @@
 
 ## Quick Setup Instructions
 
-### **Step 1: Install MySQL (if not installed)**
+### **Step 1: Install PostgreSQL (if not installed)**
 
 **Ubuntu/Debian:**
 ```bash
 sudo apt update
-sudo apt install mysql-server
-sudo mysql_secure_installation
+sudo apt install postgresql postgresql-contrib
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
 ```
 
 **macOS (with Homebrew):**
 ```bash
-brew install mysql
-brew services start mysql
-mysql_secure_installation
+brew install postgresql
+brew services start postgresql
 ```
 
 **Windows:**
-- Download MySQL from https://dev.mysql.com/downloads/mysql/
+- Download PostgreSQL from https://www.postgresql.org/download/windows/
 - Run the installer and follow the setup wizard
 
 ### **Step 2: Create the Database**
 
-1. **Login to MySQL:**
+1. **Login to PostgreSQL:**
 ```bash
-mysql -u root -p
+sudo -u postgres psql
 ```
 
-2. **Run the schema file:**
+2. **Create the database and schema:**
 ```sql
-SOURCE /home/chris/Documents/CapitecFramework-S/sql-module/capstone/animal-sanctuary-capstone-schema.sql;
+CREATE DATABASE animal_sanctuary_capstone;
+\c animal_sanctuary_capstone;
+CREATE SCHEMA animal_sanctuary_capstone;
 ```
 
-Or directly from command line:
+3. **Run Drizzle migrations:**
 ```bash
-mysql -u root -p < /home/chris/Documents/CapitecFramework-S/sql-module/capstone/animal-sanctuary-capstone-schema.sql
+npx drizzle-kit push
 ```
 
 ### **Step 3: Configure Environment Variables**
 
-Update your `.env.local` file with your MySQL credentials:
+Update your `.env.local` file with your PostgreSQL credentials:
 
 ```bash
 # Database Configuration
-DATABASE_HOST=localhost
-DATABASE_PORT=3306
-DATABASE_USER=root
-DATABASE_PASSWORD=YOUR_MYSQL_ROOT_PASSWORD
-DATABASE_NAME=animal_sanctuary_capstone`
-DATABASE_SSL=false
-DATABASE_CONNECTION_LIMIT=10
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=YOUR_POSTGRES_PASSWORD
+DB_NAME=animal_sanctuary_capstone
 ```
 
 ### **Step 4: Test the Connection**
@@ -124,26 +124,26 @@ Once the database is connected:
 
 ### Common Issues:
 
-1. **Connection refused:** Check if MySQL is running
+1. **Connection refused:** Check if PostgreSQL is running
 ```bash
-sudo systemctl status mysql
+sudo systemctl status postgresql
 # or
-brew services list | grep mysql
+brew services list | grep postgresql
 ```
 
 2. **Access denied:** Verify username/password in `.env.local`
 
-3. **Database doesn't exist:** Make sure you ran the schema file
+3. **Database doesn't exist:** Make sure you created the database and ran migrations
 
 4. **Permission issues:** Grant proper privileges:
 ```sql
-GRANT ALL PRIVILEGES ON animal_sanctuary_capstone.* TO 'root'@'localhost';
-FLUSH PRIVILEGES;
+GRANT ALL PRIVILEGES ON DATABASE animal_sanctuary_capstone TO postgres;
+GRANT ALL PRIVILEGES ON SCHEMA animal_sanctuary_capstone TO postgres;
 ```
 
 ### Test Database Connection Directly:
 ```bash
-mysql -u root -p -e "USE animal_sanctuary_capstone; SELECT COUNT(*) FROM animals;"
+psql -U postgres -d animal_sanctuary_capstone -c "SELECT COUNT(*) FROM animal_sanctuary_capstone.animals;"
 ```
 
 ## Next Steps
@@ -156,4 +156,4 @@ After database setup is complete, you can:
 4. **Build the animal detail pages** (next development phase)
 5. **Create the staff dashboard** for animal management
 
-The frontend is now fully integrated with Next.js API routes that connect directly to your MySQL database!
+The frontend is now fully integrated with Next.js API routes that connect directly to your PostgreSQL database using Drizzle ORM!

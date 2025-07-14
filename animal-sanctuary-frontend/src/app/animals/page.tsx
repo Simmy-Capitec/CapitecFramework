@@ -135,7 +135,7 @@ export default function AnimalsPage() {
               Unable to load animals at the moment. Please try again later.
             </p>
             <p className="text-red-500 text-sm mt-2">
-              Note: Database connection needs to be configured with your MySQL credentials.
+              Note: Database connection needs to be configured with your PostgreSQL credentials.
             </p>
           </div>
         )}

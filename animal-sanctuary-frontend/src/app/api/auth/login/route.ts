@@ -1,21 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+import { db, staff } from '@/lib/db';
+import { eq, and } from 'drizzle-orm';
 import { verifyPassword, generateToken, type StaffUser } from '@/utils/auth';
 import { z } from 'zod';
-
-// Database connection configuration
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306'),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'password123',
-  database: process.env.DB_NAME || 'animal_sanctuary_capstone',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-};
-
-const pool = mysql.createPool(dbConfig);
 
 // Login validation schema
 const loginSchema = z.object({
@@ -45,24 +32,10 @@ export async function POST(request: NextRequest) {
     const { email, password } = validationResult.data;
     
     // Find staff member by email
-    const [staffRows] = await pool.execute(
-      `SELECT 
-        staff_id,
-        employee_id,
-        first_name,
-        last_name,
-        email,
-        password_hash,
-        role,
-        is_active,
-        hire_date,
-        created_at
-      FROM staff 
-      WHERE email = ? AND is_active = 1`,
-      [email]
-    );
-    
-    const staffMembers = staffRows as StaffUser[];
+    const staffMembers = await db
+      .select()
+      .from(staff)
+      .where(and(eq(staff.email, email), eq(staff.isActive, true)));
     
     if (staffMembers.length === 0) {
       return NextResponse.json(
@@ -75,10 +48,12 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const staff = staffMembers[0];
+    const staffMember = staffMembers[0];
     
     // Verify password
-    const isPasswordValid = await verifyPassword(password, staff.password_hash);
+    const isPasswordValid = staffMember.passwordHash ? 
+      await verifyPassword(password, staffMember.passwordHash) : 
+      false;
     
     if (!isPasswordValid) {
       console.log('❌ AUTH: Invalid password for:', email);
@@ -93,9 +68,9 @@ export async function POST(request: NextRequest) {
     }
     
     // Generate JWT token
-    const token = generateToken(staff);
+    const token = generateToken(staffMember as any);
     
-    console.log('✅ AUTH: Login successful for:', email, '- Role:', staff.role);
+    console.log('✅ AUTH: Login successful for:', email, '- Role:', staffMember.role);
     
     // Return success response with token
     return NextResponse.json({
@@ -103,14 +78,14 @@ export async function POST(request: NextRequest) {
       data: {
         token,
         user: {
-          id: staff.staff_id,
-          email: staff.email,
-          name: `${staff.first_name} ${staff.last_name}`,
-          role: staff.role,
-          employee_id: staff.employee_id
+          id: staffMember.staffId,
+          email: staffMember.email,
+          name: `${staffMember.firstName} ${staffMember.lastName}`,
+          role: staffMember.role,
+          employee_id: staffMember.staffId
         }
       },
-      message: `Welcome back, ${staff.first_name}!`
+      message: `Welcome back, ${staffMember.firstName}!`
     });
     
   } catch (error) {
