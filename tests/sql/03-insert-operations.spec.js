@@ -31,7 +31,7 @@ test.afterEach(async () => {
 });
 
 test.describe('Level 3: INSERT Operations', () => {
-    
+
     test('should insert a new user successfully', async () => {
         const uniqueId = Date.now();
         const userData = {
@@ -42,27 +42,27 @@ test.describe('Level 3: INSERT Operations', () => {
             last_name: 'User',
             phone: '+1234567890'
         };
-        
+
         // Insert user
         const [result] = await connection.execute(`
             INSERT INTO users (username, email, password_hash, first_name, last_name, phone) 
             VALUES (?, ?, ?, ?, ?, ?)
         `, [userData.username, userData.email, userData.password_hash, userData.first_name, userData.last_name, userData.phone]);
-        
+
         // Verify insert was successful
         expect(result.affectedRows).toBe(1);
         expect(result.insertId).toBeGreaterThan(0);
-        
+
         const newUserId = result.insertId;
-        
+
         // Verify the user was actually created
         const [createdUsers] = await connection.execute(
             'SELECT id, username, email, first_name, last_name, phone, created_at, is_active FROM users WHERE id = ?',
             [newUserId]
         );
-        
+
         expect(createdUsers.length).toBe(1);
-        
+
         const createdUser = createdUsers[0];
         expect(createdUser.id).toBe(newUserId);
         expect(createdUser.username).toBe(userData.username);
@@ -80,25 +80,25 @@ test.describe('Level 3: INSERT Operations', () => {
             name: `Test Category ${uniqueId}`,
             description: 'A test category for automation testing'
         };
-        
+
         const [result] = await connection.execute(`
             INSERT INTO categories (name, description) 
             VALUES (?, ?)
         `, [categoryData.name, categoryData.description]);
-        
+
         expect(result.affectedRows).toBe(1);
         expect(result.insertId).toBeGreaterThan(0);
-        
+
         const categoryId = result.insertId;
-        
+
         // Verify the category was created
         const [createdCategories] = await connection.execute(
             'SELECT * FROM categories WHERE id = ?',
             [categoryId]
         );
-        
+
         expect(createdCategories.length).toBe(1);
-        
+
         const createdCategory = createdCategories[0];
         expect(createdCategory.name).toBe(categoryData.name);
         expect(createdCategory.description).toBe(categoryData.description);
@@ -112,9 +112,9 @@ test.describe('Level 3: INSERT Operations', () => {
             INSERT INTO categories (name, description) 
             VALUES (?, ?)
         `, [`Product Category ${Date.now()}`, 'Category for product testing']);
-        
+
         const categoryId = categoryResult.insertId;
-        
+
         const uniqueId = Date.now();
         const productData = {
             sku: `TEST-SKU-${uniqueId}`,
@@ -126,17 +126,17 @@ test.describe('Level 3: INSERT Operations', () => {
             stock_quantity: 100,
             reorder_level: 10
         };
-        
+
         const [result] = await connection.execute(`
             INSERT INTO products (sku, name, description, price, cost, category_id, stock_quantity, reorder_level) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `, [productData.sku, productData.name, productData.description, productData.price, productData.cost, productData.category_id, productData.stock_quantity, productData.reorder_level]);
-        
+
         expect(result.affectedRows).toBe(1);
         expect(result.insertId).toBeGreaterThan(0);
-        
+
         const productId = result.insertId;
-        
+
         // Verify the product was created with category relationship
         const [createdProducts] = await connection.execute(`
             SELECT p.*, c.name as category_name 
@@ -144,9 +144,9 @@ test.describe('Level 3: INSERT Operations', () => {
             LEFT JOIN categories c ON p.category_id = c.id 
             WHERE p.id = ?
         `, [productId]);
-        
+
         expect(createdProducts.length).toBe(1);
-        
+
         const createdProduct = createdProducts[0];
         expect(createdProduct.sku).toBe(productData.sku);
         expect(createdProduct.name).toBe(productData.name);
@@ -168,22 +168,22 @@ test.describe('Level 3: INSERT Operations', () => {
             email: `unique1_${uniqueId}@example.com`,
             password_hash: 'hashed_password'
         };
-        
+
         // Insert first user
         const [firstResult] = await connection.execute(`
             INSERT INTO users (username, email, password_hash) 
             VALUES (?, ?, ?)
         `, [userData.username, userData.email, userData.password_hash]);
-        
+
         expect(firstResult.affectedRows).toBe(1);
-        
+
         // Try to insert second user with same username
         try {
             await connection.execute(`
                 INSERT INTO users (username, email, password_hash) 
                 VALUES (?, ?, ?)
             `, [userData.username, `unique2_${uniqueId}@example.com`, userData.password_hash]);
-            
+
             // Should not reach this point
             expect(true).toBe(false);
         } catch (error) {
@@ -191,14 +191,14 @@ test.describe('Level 3: INSERT Operations', () => {
             expect(error.code).toBe('ER_DUP_ENTRY');
             expect(error.message).toContain('Duplicate entry');
         }
-        
+
         // Test duplicate email
         try {
             await connection.execute(`
                 INSERT INTO users (username, email, password_hash) 
                 VALUES (?, ?, ?)
             `, [`unique_user_${uniqueId}`, userData.email, userData.password_hash]);
-            
+
             expect(true).toBe(false);
         } catch (error) {
             expect(error.code).toBe('ER_DUP_ENTRY');
@@ -213,31 +213,31 @@ test.describe('Level 3: INSERT Operations', () => {
                 INSERT INTO users (email, password_hash) 
                 VALUES (?, ?)
             `, ['test@example.com', 'hashed_password']);
-            
+
             expect(true).toBe(false);
         } catch (error) {
             expect(error.code).toBe('ER_BAD_NULL_ERROR');
         }
-        
+
         // Test missing product name
         try {
             await connection.execute(`
                 INSERT INTO products (sku, price) 
                 VALUES (?, ?)
             `, ['TEST-SKU', '50.00']);
-            
+
             expect(true).toBe(false);
         } catch (error) {
             expect(error.code).toBe('ER_BAD_NULL_ERROR');
         }
-        
+
         // Test missing category name
         try {
             await connection.execute(`
                 INSERT INTO categories (description) 
                 VALUES (?)
             `, ['Test description']);
-            
+
             expect(true).toBe(false);
         } catch (error) {
             expect(error.code).toBe('ER_BAD_NULL_ERROR');
@@ -246,21 +246,21 @@ test.describe('Level 3: INSERT Operations', () => {
 
     test('should insert with default values', async () => {
         const uniqueId = Date.now();
-        
+
         // Insert user with only required fields
         const [userResult] = await connection.execute(`
             INSERT INTO users (username, email, password_hash) 
             VALUES (?, ?, ?)
         `, [`minimal_user_${uniqueId}`, `minimal_${uniqueId}@example.com`, 'hashed_password']);
-        
+
         const userId = userResult.insertId;
-        
+
         // Verify default values were applied
         const [users] = await connection.execute(
             'SELECT * FROM users WHERE id = ?',
             [userId]
         );
-        
+
         const user = users[0];
         expect(user.is_active).toBe(1); // Default value
         expect(user.created_at).toBeTruthy();
@@ -269,20 +269,20 @@ test.describe('Level 3: INSERT Operations', () => {
         expect(user.last_name).toBeNull();
         expect(user.phone).toBeNull();
         expect(user.last_login).toBeNull();
-        
+
         // Insert product with minimal fields
         const [productResult] = await connection.execute(`
             INSERT INTO products (sku, name, price) 
             VALUES (?, ?, ?)
         `, [`MIN-SKU-${uniqueId}`, `Minimal Product ${uniqueId}`, '25.00']);
-        
+
         const productId = productResult.insertId;
-        
+
         const [products] = await connection.execute(
             'SELECT * FROM products WHERE id = ?',
             [productId]
         );
-        
+
         const product = products[0];
         expect(product.stock_quantity).toBe(0); // Default value
         expect(product.reorder_level).toBe(10); // Default value
@@ -300,17 +300,17 @@ test.describe('Level 3: INSERT Operations', () => {
             INSERT INTO categories (name, description) 
             VALUES (?, ?)
         `, ['Electronics', 'Electronic products and accessories']);
-        
+
         const parentId = parentResult.insertId;
-        
+
         // Create child category
         const [childResult] = await connection.execute(`
             INSERT INTO categories (name, description, parent_id) 
             VALUES (?, ?, ?)
         `, ['Laptops', 'Laptop computers and accessories', parentId]);
-        
+
         const childId = childResult.insertId;
-        
+
         // Verify hierarchy
         const [categories] = await connection.execute(`
             SELECT c.id, c.name, c.parent_id, p.name as parent_name 
@@ -318,9 +318,9 @@ test.describe('Level 3: INSERT Operations', () => {
             LEFT JOIN categories p ON c.parent_id = p.id 
             WHERE c.id = ?
         `, [childId]);
-        
+
         expect(categories.length).toBe(1);
-        
+
         const category = categories[0];
         expect(category.name).toBe('Laptops');
         expect(category.parent_id).toBe(parentId);
@@ -330,29 +330,29 @@ test.describe('Level 3: INSERT Operations', () => {
     test('should insert cart items', async () => {
         // Create test user and product
         const uniqueId = Date.now();
-        
+
         const [userResult] = await connection.execute(`
             INSERT INTO users (username, email, password_hash) 
             VALUES (?, ?, ?)
         `, [`cart_user_${uniqueId}`, `cart_${uniqueId}@example.com`, 'hashed_password']);
-        
+
         const userId = userResult.insertId;
-        
+
         const [productResult] = await connection.execute(`
             INSERT INTO products (sku, name, price) 
             VALUES (?, ?, ?)
         `, [`CART-ITEM-${uniqueId}`, `Cart Product ${uniqueId}`, '30.00']);
-        
+
         const productId = productResult.insertId;
-        
+
         // Add item to cart
         const [cartResult] = await connection.execute(`
             INSERT INTO cart_items (user_id, product_id, quantity) 
             VALUES (?, ?, ?)
         `, [userId, productId, 3]);
-        
+
         expect(cartResult.affectedRows).toBe(1);
-        
+
         // Verify cart item
         const [cartItems] = await connection.execute(`
             SELECT ci.*, p.name, p.price, (ci.quantity * p.price) as total_price
@@ -360,9 +360,9 @@ test.describe('Level 3: INSERT Operations', () => {
             JOIN products p ON ci.product_id = p.id 
             WHERE ci.user_id = ? AND ci.product_id = ?
         `, [userId, productId]);
-        
+
         expect(cartItems.length).toBe(1);
-        
+
         const cartItem = cartItems[0];
         expect(cartItem.user_id).toBe(userId);
         expect(cartItem.product_id).toBe(productId);
@@ -375,21 +375,21 @@ test.describe('Level 3: INSERT Operations', () => {
     test('should insert reviews with ratings', async () => {
         // Create test user and product
         const uniqueId = Date.now();
-        
+
         const [userResult] = await connection.execute(`
             INSERT INTO users (username, email, password_hash) 
             VALUES (?, ?, ?)
         `, [`reviewer_${uniqueId}`, `reviewer_${uniqueId}@example.com`, 'hashed_password']);
-        
+
         const userId = userResult.insertId;
-        
+
         const [productResult] = await connection.execute(`
             INSERT INTO products (sku, name, price) 
             VALUES (?, ?, ?)
         `, [`REVIEW-PROD-${uniqueId}`, `Reviewed Product ${uniqueId}`, '149.99']);
-        
+
         const productId = productResult.insertId;
-        
+
         // Insert review
         const reviewData = {
             product_id: productId,
@@ -399,16 +399,16 @@ test.describe('Level 3: INSERT Operations', () => {
             comment: 'Fast delivery and great quality. Highly recommended.',
             is_verified_purchase: 1
         };
-        
+
         const [reviewResult] = await connection.execute(`
             INSERT INTO reviews (product_id, user_id, rating, title, comment, is_verified_purchase) 
             VALUES (?, ?, ?, ?, ?, ?)
         `, [reviewData.product_id, reviewData.user_id, reviewData.rating, reviewData.title, reviewData.comment, reviewData.is_verified_purchase]);
-        
+
         expect(reviewResult.affectedRows).toBe(1);
-        
+
         const reviewId = reviewResult.insertId;
-        
+
         // Verify review with user information
         const [reviews] = await connection.execute(`
             SELECT r.*, u.username 
@@ -416,9 +416,9 @@ test.describe('Level 3: INSERT Operations', () => {
             LEFT JOIN users u ON r.user_id = u.id 
             WHERE r.id = ?
         `, [reviewId]);
-        
+
         expect(reviews.length).toBe(1);
-        
+
         const review = reviews[0];
         expect(review.product_id).toBe(productId);
         expect(review.user_id).toBe(userId);
