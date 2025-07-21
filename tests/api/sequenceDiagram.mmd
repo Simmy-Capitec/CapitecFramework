@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant Client as Playwright Test Client
+    participant Server as API Server
+
+    Client->>Server: GET /secure-data<br/>(No token)
+    Server-->>Client: Status: 401 (Unauthorized)
+
+    Client->>Server: GET /secure-data<br/>Authorization: Bearer wrong-token
+    Server-->>Client: Status: 403 (Forbidden)
+
+    Client->>Server: GET /secure-data<br/>Authorization: Bearer my-secret-token
+    Server-->>Client: Status: 200 OK<br/>{ message: "This is secure data..." }
+
+    Note over Client: ASSERTIONS:<br/>✓ No token: 401<br/>✓ Wrong token: 403<br/>✓ Valid token: 200<br/>✓ Success message contains "access granted"

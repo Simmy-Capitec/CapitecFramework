@@ -56,7 +56,7 @@ export default defineConfig({
     /* Take screenshot on failure */
     screenshot: 'only-on-failure',
     /* Record video on failure */
-    video: 'on-first-retry',
+    video: 'on', // Changed from 'on-first-retry' to 'on'
     /* Slow down test execution by SLOWMO milliseconds */
     launchOptions: {
       slowMo: SLOWMO,
